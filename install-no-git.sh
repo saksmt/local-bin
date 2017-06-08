@@ -15,6 +15,7 @@ cd .install.tmp
 
 wget https://api.github.com/repos/saksmt/local-bin/tarball
 tar zxf tarball
+rm -f tarball
 
 # going into freshly unpacked tar
 cd $(ls)
