@@ -2,11 +2,11 @@
 
 prefix=$1
 
-if [[ "$prefix" == "" ]];
+if [[ "$prefix" == "" ]]; then
     prefix=$PREFIX
 fi
 
-if [[ "$prefix" == "" ]];
+if [[ "$prefix" == "" ]]; then
     prefix=/usr/local
 fi
 
