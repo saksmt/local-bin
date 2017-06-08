@@ -11,7 +11,7 @@ $ PREFIX=/usr/local make install -e
 ## Deinstallation
 
 ```bash
-$ PREFIX=/usr/local make uninstall
+$ PREFIX=/usr/local make uninstall -e
 ```
 
 ## Usage
