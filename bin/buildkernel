@@ -1,0 +1,34 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/etc/guard.sh
+source /usr/local/etc/build-tools/kernel.conf
+
+if [ "$1" == "--new" ]; then
+    echo "${info}Copying .config from $(uname -r) kernel"
+    cp /usr/src/linux-$(uname -r)/.config /usr/src/linux
+fi
+
+echo "${info}Changing lib/fonts/font_8x16.c"
+
+cd /usr/src/linux/lib/fonts
+cp $FONT font_8x16.c
+cd ../../
+
+echo "${info}Building kernel $(readlink ../linux)"
+
+make -j$(cat /proc/cpuinfo | grep processor | wc -l) 2>&1
+#| grep -P ".*(make).*" | sed "s/^\ */\ \ ${info}/g"
+
+echo "${info}Installing kernel"
+
+make install > /dev/null
+make modules_install > /dev/null
+
+echo "${info}Generating grub.cfg"
+
+grub-mkconfig -o /boot/grub/grub.cfg 2>&1 | grep -Po "\/.*gentoo(\.old)?" | sed "s/^/\ \ ${info}/g"
+
+echo "${info}/boot/ is now ${red}$(du -sh /boot | grep -Po '\d+(M|G)')${cls}"
+
+echo "${success}Done"

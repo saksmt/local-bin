@@ -1,0 +1,19 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+
+answer=
+prompt "Do you really want to drop project at ${bright}${cyan}$(pwd)${clr}?"
+
+if ! $answer; then
+    echo "${info}Aborting..."
+    exit
+fi
+
+echo "${info}Removing ${cyan}.idea${clr}"
+find -type d -name .idea -exec rm -rf {} \; &> /dev/null
+echo "${info}Removing ${cyan}*.iml${clr}"
+find -type f -name *.iml -exec rm -f {} \; &> /dev/null
+echo "${success}Done"
+

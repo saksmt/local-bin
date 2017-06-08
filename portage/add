@@ -1,0 +1,44 @@
+#!/bin/bash
+
+source /usr/local/etc/overlay/config
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+
+cd $LOCAL_OVERLAY
+
+if [ $1 == "git" ]; then
+    echo $success"Adding..."
+    mkdir $3 -p
+    echo "git>"$2 > $3/.url
+    ./bin/upd $3
+    exit
+fi
+
+ATOM=""
+URL="$1"
+
+if [ $1 == "pkg" ]; then
+    if [[ $2 =~ [\/] ]]; then
+        ATOM="$2"
+        URL="http://data.gpo.zugaina.org/$3/$2"
+    else
+        ATOM="$3"
+        URL="http://data.gpo.zugaina.org/$2/$3"
+    fi
+else
+    ATOM=$(echo ${1} | grep -oP -f .link-regexp)
+fi
+
+prompt "Add new atom(${cyan}${ATOM}${white})? "
+
+if [[ $answer == false ]]; then
+    echo ""$error"Aborting..."
+    exit
+fi
+
+echo ""$success"Adding..."
+
+mkdir $ATOM -p
+echo $URL > $ATOM/.url
+./bin/upd $ATOM
+

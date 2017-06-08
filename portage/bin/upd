@@ -1,0 +1,43 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+LOGPATH="${PWD}/fetch.log"
+
+cd $1
+
+W_P="-r -q -np -nd"
+
+URL="local"
+
+if [[ -e ".url" ]]; then
+    URL=$(cat .url)
+fi
+
+echo ""$info"Syncing ${cyan}${1}${clr} with ${cyan}${URL}${clr}."
+
+if [[ "$URL" != "local" ]]; then
+    rm -rf *
+    W_REGEX='^'$(echo $URL | sed 's/\//\\\//g' | sed 's/\./\\\./g' | sed 's/\-/\\\-/g' | sed 's/\:/\\\:/g')'(.*?)$'
+    W_P=$W_P" --accept-regex=$W_REGEX --regex-type=pcre -a ${LOGPATH}"
+
+
+    if [ "$(echo $URL | grep -P '^git\>')" == "" ]; then
+        mkdir files
+        
+        wget $W_P $URL > /dev/null
+        grep -rliI '<\!doctype html' | sed 's/\ /\\\ /g' | xargs rm &> /dev/null
+        FILES=$(find . -type f | grep -vP "(ChangeLog|ebuild|xml|Manifest|\.url)" | sed 's/\ /\\\ /g')
+        if [ "$FILES" != "" ]; then
+            echo $FILES | xargs mv --target-directory=files
+        fi
+    else
+        ../../bin/fetch-git $URL $1
+    fi
+fi
+
+for file in `find . -type f -regex ".*\.ebuild"`; do
+	(ebuild $file digest > /dev/null) &
+done
+cd ../../../
+

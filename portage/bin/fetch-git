@@ -1,0 +1,15 @@
+#!/bin/bash
+mkdir .tmp
+cd .tmp
+git clone $(echo $1 | sed "s/git>//") &> /dev/null
+DIR=$(find -type d | grep $2 | head -n1)
+if [[ "$DIR" == "" ]]; then
+    echo "${error}Package(${cyan}${1}${clr}) not found!"
+    exit
+else
+    DIR="$DIR/*"
+fi
+mv $DIR ../
+cd ..
+rm -rf .tmp
+

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+source /usr/local/etc/overlay/config
+source /usr/local/etc/colors.sh
+
+LOGPATH="${PWD}/fetch.log"
+
+echo "" > $LOGPATH
+
+cd $LOCAL_OVERLAY 
+if [[ "$1" != "" ]]; then
+    ./bin/upd $1
+else
+    for file in `find -L . -type d | grep -oP -f .atom-regexp | sort -u`; do
+        ./bin/upd $file &
+    done
+
+    wait `pidof upd`
+fi
+
+egencache  --update --repo LOCAL
+egencache  --update-use-local-desc --repo LOCAL
+egencache  --update-manifests --repo LOCAL
+
+echo -e "\n"$success"Done!"
+

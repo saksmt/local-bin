@@ -1,0 +1,17 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+if [ "$1" == "-v" ]; then
+	cat /proc/meminfo | grep -P "(MemFree|(Swap|)Cached)"
+fi
+
+echo "${info}syncing"
+sync
+echo "${info}freeing"
+echo 3 > /proc/sys/vm/drop_caches
+
+if [ "$1" == "-v" ]; then
+	echo ""
+	cat /proc/meminfo | grep -P "(MemFree|(Swap|)Cached)"
+fi

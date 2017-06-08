@@ -1,0 +1,37 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+if [[ "$1" == "" ]]; then
+    echo "${error}No file specified!"
+    exit -1
+fi
+
+if [[ ! -f "$1" ]]; then
+    echo "${error}File doesn't exist!"
+    exit -1
+fi
+
+readonly executable="$(mktemp)"
+
+shebang="$2"
+
+case "$shebang" in
+    "jar") shebang="#!/usr/bin/java -jar" ;;
+    "php") shebang="#!/usr/bin/env php" ;;
+esac
+
+if [[ "$shebang" == "" ]]; then
+    echo "${warning}No shebang specified!"
+    echo "${info}Using default one..."
+    shebang="#!/bin/bash"
+fi
+
+echo $shebang > $executable
+cat $1 >> $executable
+chmod +x $executable
+rm -f $1
+mv $executable $1
+rm -f $executable
+
+echo "${success}Done!"

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+function prompt {
+    local questionAnswerVariants="["$green"Y"$clr"|"$red"n"$clr"]"
+    local ans=""
+    while true; do
+        echo -n $white""$bright">>> "$clr""$1""$clr" "$questionAnswerVariants" "
+        read -n1 ans
+        if [[ ! ( $ans =~ [yYnN] || $ans == "" ) ]]; then
+            echo ""
+            echo "Sorry didn't understand, try again."
+        else
+            if [[ $ans != "" ]]; then
+                echo ""
+            fi
+            if [[ $ans =~ [yY] || $ans == "" ]]; then
+                answer=true
+            else
+                answer=false
+            fi
+            break
+        fi
+    done
+}
+

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+cd $COMMANDS_PATH
+
+available=$(ls -l | grep -P "[rw\-]{2}x" | grep -Pv "(^d)|(/$)" | grep -Po "\w{2,}$")
+
+function list-available () {
+    echo -e "${info}Available commands:"
+    for c in $available; do
+        echo " ${info}${c}"
+    done
+}
+
+if [[ "$1" == "" ]]; then
+    list-available
+    exit
+fi
+
+if [[ "$(echo -e $available | grep -P '(^|\ )'$1'($|\ )')" == "" ]]; then
+    echo -e "${error}Invalid command \"${1}\""
+    list-available
+    exit
+fi
+
+cmd=""
+for arg in $@; do
+    cmd="${cmd}${arg} "
+done
+
+./$cmd
+

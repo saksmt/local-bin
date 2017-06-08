@@ -1,0 +1,17 @@
+#!/bin/bash
+
+source "/usr/local/etc/guard.sh"
+source "/usr/local/etc/colors.sh"
+source "/usr/local/lib/prompt"
+
+prompt "Do you really want to remove ${cyan}${1}${clr} from overlay? "
+
+if [[ $answer == false ]]; then
+    echo "${error}Aborting..."
+    exit
+fi
+
+rm -rf ./$1
+rm -rf ./metadata/md5-cache/$1
+
+echo "${success}${cyan}${1}${clr} successfully removed!"

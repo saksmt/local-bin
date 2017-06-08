@@ -1,0 +1,114 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+function do-print() {
+    nonewline=
+    if [[ "$1" == "-n" ]]; then
+        nonewline=yes
+        shift
+    fi
+    echo -n $1
+    echo -n $2
+    if [[ "${nonewline}" == "" ]]; then
+        echo "${clr}"
+    else
+        echo -n "${clr}"
+    fi
+}
+
+function print-cyan() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $cyan $2
+    else
+        do-print $cyan $1
+    fi
+}
+
+function print-black() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $black $2
+    else
+        do-print $black $1
+    fi
+}
+
+function print-red() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $red $2
+    else
+        do-print $red $1
+    fi
+}
+
+function print-green() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $green $2
+    else
+        do-print $green $1
+    fi
+}
+
+function print-brown() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $brown $2
+    else
+        do-print $brown $1
+    fi
+}
+
+function print-blue() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $blue $2
+    else
+        do-print $blue $1
+    fi
+}
+
+function print-violet() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $violet $2
+    else
+        do-print $violet $1
+    fi
+}
+
+function print-white() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $white $2
+    else
+        do-print $white $1
+    fi
+}
+
+function print-yellow() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $yellow $2
+    else
+        do-print $yellow $1
+    fi
+}
+
+function print-bright() {
+    if [[ "$1" == "-n" ]]; then
+        do-print -n $bright $2
+    else
+        do-print $bright $1
+    fi
+}
+
+function print-info() {
+    echo "${info}${1}"
+}
+
+function print-success() {
+    echo "${success}${1}"
+}
+
+function print-error() {
+    echo "${error}${1}"
+}
+
+function print-warning() {
+    echo "${warning}${1}"
+}

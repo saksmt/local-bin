@@ -1,0 +1,14 @@
+#!/bin/bash
+
+source /usr/local/etc/overlay/config
+
+COMMANDS_PATH=$LOCAL_OVERLAY
+
+if [[ "$1" == "search" ]]; then
+    eix -R $2 $3 $4 $5
+    exit
+fi
+
+source /usr/local/etc/guard.sh
+source /usr/local/lib/command-loader
+
