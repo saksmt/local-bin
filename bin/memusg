@@ -1,0 +1,22 @@
+#!/bin/bash
+
+source /usr/local/etc/colors.sh
+
+if [[ "$1" == "" ]]; then
+    echo 'Usage: memusg <PROCESS_NAME>'
+    exit 1
+fi
+
+pids=$(ps aux | grep -i $1 | grep -v grep | grep -v memusg | awk '{ print $2; }')
+
+if [[ "$pids" == "" ]]; then
+    echo "${error}No process found with name: ${cyan}$1${clr}"
+    exit -1
+fi
+
+pmapOut=$(pmap -x $pids | tail -n 1)
+pmapUsage=$(echo -e $pmapOut | awk '{ print $3; }')
+usg=$(($pmapUsage / 1024))
+
+echo "${info}Used memory (total, with shared blocks): ${usg}MB"
+
