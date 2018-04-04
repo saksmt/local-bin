@@ -1,0 +1,36 @@
+#!/bin/bash
+
+source /usr/local/etc/guard.sh
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+
+destructionPath=$(realpath ${1})
+shreddingRounds=10
+
+if ! [[ -d ${destructionPath} ]]; then
+    echo "${error}Given path (${cyan}${destructionPath}${crl}) is either does not exist or is not a directory!"
+    exit 1
+fi
+
+if ! prompt "Do you really want to destroy all files in ${cyan}${destructionPath}${clr}?" inverse; then
+    echo "${warning}Aborting destruciton of ${cyan}${destructionPath}${clr}"
+    exit 0
+fi
+
+filesToShred=$(find ${destructionPath} -type f)
+
+echo "${info}Shredding files in ${cyan}${destructionPath}${clr}..."
+
+for fileToShred in $filesToShred; do
+    echo "  ${info}About to shred ${cyan}${fileToShred}${clr}"
+    for i in $(seq 0 $shreddingRounds); do
+        shred $fileToShred
+        sync
+    done
+done
+
+echo "${success}Done"
+echo "${info}Dropping destroyed files recursively"
+
+rm -rf ${destructionPath}
+

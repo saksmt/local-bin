@@ -3,7 +3,15 @@
 source /usr/local/etc/colors.sh
 
 function prompt {
-    local questionAnswerVariants="["$green"Y"$clr"|"$red"n"$clr"]"
+    local inversed
+
+    if [[ "$2" == "inverse" ]]; then
+        inversed=true
+    else
+        inversed=false
+    fi
+
+    local questionAnswerVariants=$($inversed && echo "[${red}y${clr}|${green}N${clr}]" || echo "[${green}Y${clr}|${red}n${clr}]")
     local ans=""
     while true; do
         echo -n $white""$bright">>> "$clr""$1""$clr" "$questionAnswerVariants" "
@@ -15,7 +23,7 @@ function prompt {
             if [[ $ans != "" ]]; then
                 echo ""
             fi
-            if [[ $ans =~ [yY] || $ans == "" ]]; then
+            if [[ $ans =~ [yY] || ( $ans == "" && ! "$inversed" == "true" ) ]]; then
                 answer=true
             else
                 answer=false
@@ -23,5 +31,13 @@ function prompt {
             break
         fi
     done
+
+    local returnCode
+    if [[ "$answer" == "true" ]]; then
+        returnCode=0
+    else
+        returnCode=1
+    fi
+    return $returnCode
 }
 
