@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 esc=`echo -en "\033"`
 

@@ -1,6 +1,6 @@
 # @saksmt script collection
 
-Some scripts born while using gentoo
+Some scripts born while using gentoo & nixos
 
 ## Installation
 
