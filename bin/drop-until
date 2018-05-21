@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+arg="${1}"
+
+if [[ "${arg}" == "-h" ]]; then
+    echo "Usage: drop-until <EQUAL-TO>"
+    echo 'Example: echo "1\n2\n---\n3\n4" | drop-until "---" # 3\n4'
+    exit 0
+fi
+
+seen=n
+
+while read line; do
+    if [[ "${seen}" == "y" ]]; then
+        echo "${line}"
+    elif [[ "${line}" == "${arg}" ]]; then
+        seen=y
+    fi
+done

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+arg="${1}"
+
+if [[ "${arg}" == "-h" ]]; then
+    echo "Usage: take-until <EQUAL-TO>"
+    echo 'Example: echo "1\n2\n3\n4" | take-until "3" # 1\n2'
+    exit 0
+fi
+
+seen=n
+
+while read line; do
+    if [[ "${seen}" == "n" ]]; then
+        echo "${line}"
+    elif [[ "${line}" == "${arg}" ]]; then
+        seen=y
+    fi
+done

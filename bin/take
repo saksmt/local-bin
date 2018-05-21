@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+arg="${1}"
+
+if [[ "$arg" == "-h" ]]; then
+    echo "Usage: take <NR-OF-LINES>"
+    echo 'Example: echo "1\n2\n3" | take 2 # 1\n2'
+fi
+
+head -n${arg}
+
