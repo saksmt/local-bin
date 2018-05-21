@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+function inArray() {
+    what="${1}"
+    shift
+    for e in ${@}; do
+        if [[ "${e}" == "${what}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+seen=()
+
+if [[ "${1}" == "-h" ]]; then
+    echo "Usage: <SOME-OUTPUT> | unique"
+    echo "  Make output distinct with order preservation"
+    echo 'Example: echo "1\n2\n1\n41\n2\n3" | unique # 1\n4\n2\n3'
+    exit 0
+fi
+
+while read line; do
+    if ! inArray "${line}" ${seen[@]}; then
+        echo "${line}"
+        seen+=($line)
+    fi
+done
+
