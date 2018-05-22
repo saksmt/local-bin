@@ -2,16 +2,16 @@
 
 function inArray() {
     what="${1}"
-    shift
-    for e in ${@}; do
-        if [[ "${e}" == "${what}" ]]; then
-            return 0
-        fi
-    done
+    arrayFile="${2}"
+    while read l; do
+        if [[ "${what}" == "${l}" ]]; then
+	    return 0
+	fi
+    done < "${arrayFile}"
     return 1
 }
 
-seen=()
+seen=$(mktemp)
 
 if [[ "${1}" == "-h" ]]; then
     echo "Usage: <SOME-OUTPUT> | unique"
@@ -21,9 +21,10 @@ if [[ "${1}" == "-h" ]]; then
 fi
 
 while read line; do
-    if ! inArray "${line}" ${seen[@]}; then
+    if ! inArray "${line}" "${seen}"; then
         echo "${line}"
-        seen+=($line)
+	echo "${line}" >> ${seen}
     fi
 done
 
+rm -f ${seen}
