@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+PREFIX=".*\/media\/music\/"
+FAV_FILE="$(readlink -f ~/.fav-list)"
+SEP="---"
+SEP_ESCAPED="\-\-\-"
+
+function add() {
+    songPath=$(deadbeef --nowplaying "%F" 2> /dev/null | sed "s/${PREFIX}//")
+    songName=$(deadbeef --nowplaying "%a (%b) - %n. %t" 2> /dev/null)
+    [ -f ${FAV_FILE} ] || echo "${SEP}" >> ${FAV_FILE}
+    echo "${songPath} // ${songName}" >> ${FAV_FILE}
+    echo "${success}Added ${cyan}${songName}${clr} to favorites list"
+}
+
+function flush() {
+    sed -i "/${SEP_ESCAPED}/d" "${FAV_FILE}"
+    echo "${SEP}" >> ${FAV_FILE}
+    echo "${success}Flushed current favorites"
+}
+
+function show-all-raw() {
+    cat "${FAV_FILE}" | unique
+}
+
+function prettify() {
+    sort | sed "s/^/${listItem} ${cyan}/" | sed "s/$/${clr}/"
+}
+
+function show() {
+    raw=n
+    latest=n
+
+    while [[ $# -gt 0 ]]; do
+        case ${1} in
+            --raw | raw | -r ) raw=y; shift ;;
+	    --new | --latest | new | latest | -l | -n ) latest=y; shift ;;
+	    * ) shift ;;
+	esac
+    done
+
+    if [[ "${raw}${latest}" == "ny" ]]; then
+        echo "${success}Current non-flushed favorites playlist contains:"
+        show-all-raw | drop-until "${SEP}" | prettify
+    elif [[ "${raw}${latest}" == "nn" ]]; then
+        echo "${success}Current favorites playlist contains:"
+        show-all-raw | sed "/${SEP_ESCAPED}/d" | prettify
+    elif [[ "${raw}${latest}" == "yy" ]]; then
+        show-all-raw | drop-until "${SEP}" | sort
+    else
+        show-all-raw | sed "/${SEP_ESCAPED}/d" | sort
+    fi
+}
+
+function help() {
+    echo "fav-deadbeef - Manage favorites playlist (for deadbeef)"
+    echo "USAGE"
+    echo "  fav-deadbeef <add|flush|dump|show|latest|new|show-latest|show-new|show-raw|raw|help> [OPTIONS]"
+    echo "MODES"
+    echo "  add             Add currently playing song to favorites"
+    echo "  flush|dump      Flush playlist of currently non proccessed (non copied to player for ex.)"
+    echo "  show [OPTIONS]  Show favorites playlist. Available options:"
+    echo "                    -r, --raw, raw,     Output raw list without decorations or additional messages"
+    echo "                    -l, -n, --latest    Output only unflushed playlist"
+    echo "                    --new, latest, new"
+    echo "  show-raw|raw    Aliases for 'show --raw'"
+    echo "  show-latest|    Aliases for 'show --new'"
+    echo "  new|show-new|"
+    echo "  latest"
+    echo "  help            Show this help"
+}
+
+mode="${1}"
+shift
+
+case ${mode} in
+    add | "")                               add ;;
+
+    flush | dump )                          flush ;;
+
+    show )                                  show ${@} ;;
+
+    latest | new | show-latest | show-new ) show --latest ${@} ;;
+
+    show-raw | raw )                        show --raw ${@} ;;
+
+    help | * )                              help ;;
+esac
+
