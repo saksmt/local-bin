@@ -3,7 +3,7 @@
 source /usr/local/etc/colors.sh
 
 PREFIX=".*\/media\/music\/"
-FAV_FILE="$(readlink -f ~/.fav-list)"
+FAV_FILE="$(readlink -f ~/fav-test)"
 SEP="---"
 SEP_ESCAPED="\-\-\-"
 
@@ -16,9 +16,19 @@ function add() {
 }
 
 function flush() {
+    cp ${FAV_FILE}{,~}
     sed -i "/${SEP_ESCAPED}/d" "${FAV_FILE}"
     echo "${SEP}" >> ${FAV_FILE}
     echo "${success}Flushed current favorites"
+}
+
+function unFlush() {
+    if [[ -f "${FAV_FILE}~" ]]; then
+        mv ${FAV_FILE}{~,}
+        echo "${success}Unflushed complete!"
+    else
+        echo "${error}Unflush is impossible! Backup file is missing"
+    fi
 }
 
 function show-all-raw() {
@@ -54,13 +64,26 @@ function show() {
     fi
 }
 
+function removeLast() {
+    lastFavorite=$(tail -n1 ${FAV_FILE})
+    if [[ "${lastFavorite}" != "${SEP}" ]]; then
+        sed -i '$ d' ${FAV_FILE}
+        echo "${success}Removed last favorite"
+        echo "${info}It was: ${cyan}${lastFavorite}${clr}"
+    else
+        echo "${warn}Nothing to do! Favorites are flushed"
+    fi
+}
+
 function help() {
     echo "fav-deadbeef - Manage favorites playlist (for deadbeef)"
     echo "USAGE"
-    echo "  fav-deadbeef <add|flush|dump|show|latest|new|show-latest|show-new|show-raw|raw|help> [OPTIONS]"
+    echo "  fav-deadbeef <add|remove|flush|dump|unflush|show|latest|new|show-latest|show-new|show-raw|raw|help> [OPTIONS]"
     echo "MODES"
     echo "  add             Add currently playing song to favorites"
+    echo "  remove          Remove last favorite. Useful when accidentally added some favorite"
     echo "  flush|dump      Flush playlist of currently non proccessed (non copied to player for ex.)"
+    echo "  unflush         Restore currently non processed. Works only once per flush"
     echo "  show [OPTIONS]  Show favorites playlist. Available options:"
     echo "                    -r, --raw, raw,     Output raw list without decorations or additional messages"
     echo "                    -l, -n, --latest    Output only unflushed playlist"
@@ -85,6 +108,10 @@ case ${mode} in
     latest | new | show-latest | show-new ) show --latest ${@} ;;
 
     show-raw | raw )                        show --raw ${@} ;;
+
+    remove )                                removeLast ;;
+
+    unflush )                               unflush ;;
 
     help | * )                              help ;;
 esac
