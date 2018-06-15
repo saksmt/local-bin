@@ -3,7 +3,9 @@
 source /usr/local/etc/colors.sh
 
 PREFIX=".*\/media\/music\/"
-FAV_FILE="$(readlink -f ~/fav-test)"
+if [[ "$FAV_FILE" == "" ]]; then
+    FAV_FILE="$(readlink -f ~/.fav-list)"
+fi
 SEP="---"
 SEP_ESCAPED="\-\-\-"
 
@@ -16,6 +18,10 @@ function add() {
 }
 
 function flush() {
+    if [[ "$(show-all-raw | drop-until "${SEP}" | wc -l)" == "0" ]]; then
+        echo "${warning}Nothing to flush!"
+        return
+    fi
     cp ${FAV_FILE}{,~}
     sed -i "/${SEP_ESCAPED}/d" "${FAV_FILE}"
     echo "${SEP}" >> ${FAV_FILE}
@@ -52,11 +58,25 @@ function show() {
     done
 
     if [[ "${raw}${latest}" == "ny" ]]; then
-        echo "${success}Current non-flushed favorites playlist contains:"
-        show-all-raw | drop-until "${SEP}" | prettify
+        tmpFile=$(mktemp)
+        show-all-raw | drop-until "${SEP}" | prettify > $tmpFile
+        if [[ "$(cat $tmpFile | wc -l)" != "0" ]]; then
+            echo "${success}Current non-flushed favorites playlist contains:"
+            cat $tmpFile
+        else
+            echo "${warning}Current non-flushed favorites playlist is empty!"
+        fi
+        rm -f $tmpFile
     elif [[ "${raw}${latest}" == "nn" ]]; then
-        echo "${success}Current favorites playlist contains:"
-        show-all-raw | sed "/${SEP_ESCAPED}/d" | prettify
+        tmpFile=$(mktemp)
+        show-all-raw | sed "/${SEP_ESCAPED}/d" | prettify > $tmpFile
+        if [[ "$(cat $tmpFile | wc -l)" != "0" ]]; then
+            echo "${success}Current favorites playlist contains:"
+            cat $tmpFile
+        else
+            echo "${warning}Current favorites playlist is empty!"
+        fi
+        rm -f $tmpFile
     elif [[ "${raw}${latest}" == "yy" ]]; then
         show-all-raw | drop-until "${SEP}" | sort
     else
@@ -111,8 +131,9 @@ case ${mode} in
 
     remove )                                removeLast ;;
 
-    unflush )                               unflush ;;
+    unflush )                               unFlush ;;
 
     help | * )                              help ;;
 esac
 
+# vim: ts=4 sw=4 et
