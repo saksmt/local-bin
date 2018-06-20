@@ -18,13 +18,16 @@ shebang="$2"
 
 case "$shebang" in
     "jar") shebang="#!/usr/bin/java -jar" ;;
-    "php") shebang="#!/usr/bin/env php" ;;
+    '#!'.*) ;; # shebang in raw format
+    '/'.*) shebang="#!$shebang" ;;
+    '') shebang='' ;;
+    *) shebang='#!/usr/bin/env '"${shebang}" ;;
 esac
 
 if [[ "$shebang" == "" ]]; then
     echo "${warning}No shebang specified!"
     echo "${info}Using default one..."
-    shebang="#!/bin/bash"
+    shebang="#!/usr/bin/env bash"
 fi
 
 echo $shebang > $executable
@@ -34,4 +37,4 @@ rm -f $1
 mv $executable $1
 rm -f $executable
 
-echo "${success}Done!"
+echo "${success}File ${cyan}${1}${clr} is now valid executable!"

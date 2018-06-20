@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+file=${1}
+
+currentShebang=$(head -n1 $file)
+
+if ! [[ "$currentShebang" =~ '#!'.* ]]; then
+    echo "${error}Given script ${cyan}${file}${clr} is not a script!"
+    exit 1
+fi
+
+currentInterpreter=${currentShebang:2}
+
+if [[ "${currentInterpreter}" =~ /usr/bin/env\ .* ]]; then
+    echo "${info}Script ${cyan}${file}${clr} already contains valid shebang"
+    exit 0
+fi
+
+newInterpreterName=$(basename $currentInterpreter)
+newInterpreter=$(which $newInterpreterName 2> /dev/null)
+if [[ "$newInterpreter" == "" ]]; then
+    echo "${error}Unknown interpreter ${cyan}${currentInterpreter}${clr} in script ${cyan}${file}${clr}!"
+    exit 1
+fi
+
+sed -i '1d' ${file}
+executify ${file} $newInterpreterName
+
+# vim: sw=4 ts=4 et
