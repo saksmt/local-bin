@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+cd /usr/local/share/docker
+
+if [[ "$@" == "" ]]; then
+    echo "${error}No arguments provided!"
+    echo "${info}Usage:"
+    echo '    docker-orchestra <COMPOSE_NAME|COMMAND> [DOCKER_COMPOSE_COMMANDS]'
+    echo
+    echo '      COMMANDS:'
+    echo '        -l, --list	List available "composes"'
+    exit
+fi
+
+if [[ "$1" == "--list" ]] || [[ "$1" == "-l" ]]; then
+    ls --color=none
+    exit
+fi
+
+if [[ ! -d $1 ]]; then
+    echo "${error}${cyan}${1}${clr} is not valid compose"
+    echo "${info}To list available composes use ${cyan}--list${clr}"
+    exit
+fi
+
+cd $1
+shift
+
+if [[ "$@" == "" ]]; then
+    docker-compose up -d
+else
+    docker-compose $@
+fi
+
+if [[ -x postexec ]]; then
+    ./postexec
+fi
