@@ -8,12 +8,10 @@ if [[ "${arg}" == "-h" ]]; then
     exit 0
 fi
 
-seen=n
-
 while read line; do
-    if [[ "${seen}" == "n" ]]; then
-        echo "${line}"
-    elif [[ "${line}" == "${arg}" ]]; then
-        seen=y
+    if [[ "${line}" == "${arg}" ]]; then
+        exit 0
+    else
+        echo $line
     fi
 done
