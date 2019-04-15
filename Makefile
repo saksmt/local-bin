@@ -2,7 +2,7 @@ ifndef PREFIX
 PREFIX = /usr/local
 endif
 
-SRC_BIN = bin/buildkernel bin/dropcaches bin/docker-orchestra bin/dropswap bin/executify bin/passwd-gen bin/overlay bin/reload-idea-project bin/memusg bin/destroy bin/take bin/take-until bin/drop-until bin/unique bin/fav-deadbeef bin/fix-shebang
+SRC_BIN = bin/buildkernel bin/dropcaches bin/docker-orchestra bin/dropswap bin/executify bin/passwd-gen bin/overlay bin/reload-idea-project bin/memusg bin/destroy bin/take bin/take-until bin/drop-until bin/unique bin/fav-deadbeef bin/fix-shebang bin/touchpad
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config
 SRC_SHARE = usr/share/font_8x16.c
 SRC_LIB = lib/colorize lib/command-loader lib/prompt

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+touchpadDeviceId=$(xinput list --id-only "$(xinput list --name-only | grep -i touchpad)")
+
+function showStatus() {
+	[[ "$(xinput list $touchpadDeviceId | grep 'This device is disabled')" =~ "This device is disabled" ]] \
+      && echo "${info}Touchpad is ${red}disabled${clr}!" \
+      || echo "${info}Touchpad is ${green}enabled${clr}!"
+}
+
+function disable() {
+    xinput disable $touchpadDeviceId
+    echo "${success}Touchpad is ${red}disabled${clr}!"
+}
+
+function enable() {
+    xinput enable $touchpadDeviceId
+    echo "${success}Touchpad is ${green}enabled${clr}!"
+}
+
+case "$1" in
+    "status" | "--status" | "") showStatus ;;
+    "enable" | "--enable") enable ;;
+    "disable" | "--disable") disable ;;
+    *) echo "${error}Unknown comand: ${cyan}${1}${clr}. Available commands are: ${cyan}status${clr}, ${cyan}enable${clr}, ${cyan}disable${clr}"; exit 1 ;;
+esac
