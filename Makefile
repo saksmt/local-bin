@@ -2,8 +2,8 @@ ifndef PREFIX
 PREFIX = /usr/local
 endif
 
-SRC_BIN = bin/buildkernel bin/dropcaches bin/docker-orchestra bin/dropswap bin/executify bin/passwd-gen bin/overlay bin/reload-idea-project bin/memusg bin/destroy bin/take bin/take-until bin/drop-until bin/unique bin/fav-deadbeef bin/fix-shebang bin/touchpad
-SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config
+SRC_BIN = bin/buildkernel bin/dropcaches bin/docker-orchestra bin/dropswap bin/executify bin/passwd-gen bin/overlay bin/reload-idea-project bin/memusg bin/destroy bin/take bin/take-until bin/drop-until bin/unique bin/fav-deadbeef bin/fix-shebang bin/touchpad bin/mkpr bin/git-parents
+SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf
 SRC_SHARE = usr/share/font_8x16.c
 SRC_LIB = lib/colorize lib/command-loader lib/prompt
 SRC_PORTAGE = portage/bin/fetch-git portage/bin/upd portage/add portage/remove portage/sync portage/.atom-regexp portage/.link-regexp portage/metadata/layout.conf portage/profiles/repo_name

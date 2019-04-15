@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+source /usr/local/etc/pr.conf
+
+[[ n"$LOGIN" == "n" ]] && { echo "${error}No login specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
+[[ n"${REPO_URL}" == "n" ]] && { echo "${error}No repo url specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
+
+API_URL="${REPO_URL}/rest/api/1.0"
+
+if ! [[ -d .git ]]; then
+    echo "${error}Not in repository root!"
+    exit 1
+fi
+
+if [[ "$(git status -s)" != "" ]]; then
+    echo "${warning}There are untracked changes!"
+    prompt "Continue?" || {
+        echo "${error}Aborting";
+        exit 1;
+    }
+fi
+
+mapfile -t parents < <(git-parents)
+targetBranch=
+
+sourceBranch=$(git rev-parse --abbrev-ref HEAD)
+
+for (( i=0; i < ${#parents[@]}; i++ )); do
+    echo "${info}Found parent branch: ${cyan}${parents[$i]}${clr}"
+    prompt "Use it as target branch for PR?" && {
+      targetBranch=${parents[$i]};
+      break;
+    }
+done
+
+descriptionFile=$(mktemp)
+PAGER= git log --format='format:%B' ${targetBranch}..${sourceBranch} > $descriptionFile
+mapfile -t commits < <(cat $descriptionFile)
+
+function askTitle() {
+    echo "${info}Suggesting title to be ${cyan}${1}${clr}"
+    if prompt "Accept?"; then
+        response="${1}"
+    else
+        read -e -p "${bright}${white}>>>${clr} Type in your title: " -i "${1}" response
+    fi
+}
+
+function askDescription() {
+    echo "${info}Suggesting description to be:"
+    echo
+    cat $descriptionFile | sed 's/^/   /g'
+    echo
+    if prompt "Accept?"; then
+        return 0
+    else
+        $EDITOR $descriptionFile
+    fi
+}
+
+if [[ "${#commits[@]}" == "1" ]]; then
+    askTitle "${commits[@]}"
+    title="${response}"
+    askDescription "${commits[@]}"
+else
+    askTitle "$(echo ${sourceBranch} | sed 's/[_\-]/ /g' | sed 's/\//\: /g')"
+    title="${response}"
+    askDescription "${commits[@]}"
+fi
+
+mapfile -t projectAndRepo < <(git remote get-url origin | tr '/' "\n" | tail -n2 | sed 's/\.git//g')
+project=${projectAndRepo[0]}
+repo=${projectAndRepo[1]}
+
+function field() {
+    echo "   ${bright}${white}${1}${clr}: ${2}"
+}
+echo "${info}About to create PR:"
+echo
+field "Project" "${projectAndRepo[0]}"
+field "Repositoty" "${projectAndRepo[1]}"
+field "Source branch" "${sourceBranch}"
+field "Target branch" "${targetBranch}"
+field "Title" "${title}"
+echo "   ${bright}${white}Description${clr}:"
+echo
+cat ${descriptionFile} | sed "s/^/      /g"
+echo
+
+function getPass() {
+    secret-tool lookup $LOGIN $USER
+}
+
+if prompt "Proceed?"; then
+    pass=$(getPass)
+    if [[ n"$pass" == "n" ]]; then
+        echo "${info}Using script first time, huh?"
+        echo "${info}Enter your password on stash"
+        echo -n "${bright}${white}>>> ${clr}"
+        secret-tool store --label "Stash login" $LOGIN $USER
+    fi
+    pass=$(getPass)
+
+    resultFile=$(mktemp)
+    reviewersFile=$(mktemp)
+
+    jqShowURL="@uri "'"'"${REPO_URL}/projects/${project}/repos/${repo}/pull-requests/\\(.id)/overview"'"'
+    jqShowErrors='(.errors | map("'"${error}"'\(.message) (Context: \(.context))"))[]'
+
+    echo
+
+    repoId=$(http --auth "${LOGIN}:${pass}" -j "$API_URL/projects/${project}/repos/${repo}" | jq -r ".id")
+    http --auth "${LOGIN}:${pass}" -j "$REPO_URL/rest/default-reviewers/latest/projects/${project}/repos/${repo}/reviewers" sourceRepoId==${repoId} targetRepoId==${repoId} sourceRefId=="refs/heads/${sourceBranch}" targetRefId=="refs/heads/${targetBranch}" > $reviewersFile
+
+    mv $reviewersFile{,.tmp}
+    cat ${reviewersFile}.tmp | jq 'map(.name)' > $reviewersFile
+    rm -f ${reviewersFile}.tmp
+
+    jo \
+      title="${title}" \
+      description=@$descriptionFile \
+      state=OPEN \
+      open=true \
+      closed=false \
+      fromRef=$(jo \
+        id="refs/heads/${sourceBranch}" \
+        repository=$(jo \
+          slug="${repo}" \
+          name=null \
+          project\[key\]=${project} \
+        ) \
+      ) \
+      toRef=$(jo \
+        id="refs/heads/${targetBranch}" \
+        repository=$(jo \
+          slug=${repo} \
+          name=null \
+          project\[key\]=${project} \
+        ) \
+      ) \
+      locked=false \
+      reviewers=@${reviewersFile} \
+    | http --auth "${LOGIN}:${pass}" $API_URL/projects/${project}/repos/${repo}/pull-requests \
+    | jq -r 'if .id != null then ('"${jqShowURL}"') else ('"${jqShowErrors}"') end' \
+    > $resultFile
+
+    if [[ "$(head -c1 $resultFile)" == "h" ]]; then
+        echo "${info}Copying URL to pull-request to clipboard"
+        cat $resultFile | xsel -b
+    else
+        cat $resultFile
+    fi
+
+    rm -f $resultFile
+    rm -f $reviewersFile
+
+fi
+
+rm -f $descriptionFile

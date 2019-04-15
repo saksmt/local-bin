@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+git log --decorate --simplify-by-decoration --oneline \
+      | grep -v "(HEAD" \
+      | head -n5 \
+      | sed 's/.* (\(.*\)) .*/\1/' \
+      | sed 's/\(.*\), .*/\1/' \
+      | sed 's/origin\///'
