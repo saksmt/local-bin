@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+source /usr/local/lib/require-binary
+
+require-bin rev util-linux
+
+LOGGER_LEVEL_TRACE=1
+LOGGER_LEVEL_DEBUG=2
+LOGGER_LEVEL_INFO=3
+LOGGER_LEVEL_WARN=4
+LOGGER_LEVEL_ERROR=5
+
+GLOBAL_LOGGER_LEVEL=$(echo ${GLOBAL_LOGGER_LEVEL} | grep -P "^[0-9]+$")
+GLOBAL_LOGGER_LEVEL=$(( ${GLOBAL_LOGGER_LEVEL} ))
+if [[ ${GLOBAL_LOGGER_LEVEL} < 1 ]] || [[ ${GLOBAL_LOGGER_LEVEL} > 6 ]]; then
+    GLOBAL_LOGGER_LEVEL=${LOGGER_LEVEL_INFO}
+fi
+
+function __has-f() {
+    declare -f ${1} &> /dev/null
+    return $?
+}
+
+function __sanitizeLoggerName() {
+    resultName=$(echo "${1}" | sed 's/[.\/\\:#$\-^%&*=+\(\)\[\]{}\|~\`@!,\s]/_/g')
+    if [[ "${resultName}" != "${1}" ]]; then
+        rootLogger.error Invalid logger name given: ${1}, using ${resultName} instead
+    fi
+    echo ${resultName}
+}
+
+function __mkLoggerFunc() {
+    source /dev/stdin <<EOF
+    function ${1}Logger.${2}() {
+        wanted=\${LOGGER_LEVEL_${2^^}}
+        enabled=\$(${1}Logger.getLogLevel)
+
+        if [[ \${wanted} -ge \${enabled} ]]; then
+            tag="${1}.${2}"
+            if ! [ -t 0 ]; then # we are in pipe
+                [[ \$# -gt 0 ]] && logger -t \$tag \$@
+                sed 's/^/\>   /g' | logger -t \$tag
+            else
+                logger -t \$tag \$@
+            fi
+        fi
+    }
+EOF
+}
+
+function __getParentLogger() {
+    parent=$(echo ${1} | sed 's/Logger$//' | rev | cut -d '_' -f 2- -s | rev)
+    echo ${parent:-root}
+}
+
+function __getLogLevel() {
+    if __has-f "${1}Logger.getLogLevel"; then
+        ${1}Logger.getLogLevel
+    else
+        loggerLevelVar="logger_${1}_level"
+        loggerLevel=$(( $(echo ${!loggerLevelVar} | grep -P "^[0-9]+$") ))
+        if [[ ${loggerLevel} < ${LOGGER_LEVEL_TRACE} ]] || [[ ${loggerLevel} > ${LOGGER_LEVEL_ERROR} ]]; then
+            __getLogLevel $(__getParentLogger ${1})
+        else
+            echo ${loggerLevel}
+        fi
+    fi
+}
+
+function mkLogger() {
+    loggerName=$(__sanitizeLoggerName ${1})
+
+    source /dev/stdin <<EOF
+    logger_${1}_level=\$(echo \${logger_${1}_level} | grep -P "^[0-9]+$")
+    logger_${1}_level=\$(( \${logger_${1}_level} ))
+    function ${loggerName}Logger.getLogLevel() {
+        levelToCheck=\${logger_${1}_level}
+        if [[ \${levelToCheck} < ${LOGGER_LEVEL_TRACE} ]] || [[ \${levelToCheck} > ${LOGGER_LEVEL_ERROR} ]]; then
+            __getLogLevel $(__getParentLogger ${loggerName})
+        else
+            echo \${levelToCheck}
+        fi
+    }
+EOF
+
+    for level in trace debug info warn error; do
+        __mkLoggerFunc "${loggerName}" ${level}
+    done
+}
+
+function also-pipe-to() {
+    tmpFile=$(mktemp)
+    cat > ${tmpFile}
+    cat ${tmpFile} | eval "${@}"
+    cat ${tmpFile}
+    rm -f ${tmpFile}
+}
+
+mkLogger root
+function rootLogger.getLogLevel() {
+    if [[ ${GLOBAL_LOGGER_LEVEL} < 1 ]] || [[ ${GLOBAL_LOGGER_LEVEL} > 6 ]]; then
+        GLOBAL_LOGGER_LEVEL=${LOGGER_LEVEL_INFO}
+    fi
+    echo ${GLOBAL_LOGGER_LEVEL}
+}

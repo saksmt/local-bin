@@ -3,6 +3,15 @@
 source /usr/local/etc/colors.sh
 source /usr/local/lib/prompt
 source /usr/local/etc/pr.conf
+source /usr/local/lib/require-binary
+source /usr/local/lib/logging
+
+require-bin jo jo
+require-bin jq jq
+require-bin http httpie
+require-bin secret-tool libsecret
+
+mkLogger mkpr
 
 [[ n"$LOGIN" == "n" ]] && { echo "${error}No login specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
 [[ n"${REPO_URL}" == "n" ]] && { echo "${error}No repo url specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
@@ -23,20 +32,22 @@ if [[ "$(git status -s)" != "" ]]; then
 fi
 
 mapfile -t parents < <(git-parents)
-targetBranch=
+targetBranch=${1}
 
 sourceBranch=$(git rev-parse --abbrev-ref HEAD)
 
-for (( i=0; i < ${#parents[@]}; i++ )); do
-    echo "${info}Found parent branch: ${cyan}${parents[$i]}${clr}"
-    prompt "Use it as target branch for PR?" && {
-      targetBranch=${parents[$i]};
-      break;
-    }
-done
+if [[ n"${targetBranch}" == "n" ]]; then
+    for (( i=0; i < ${#parents[@]}; i++ )); do
+        echo "${info}Found parent branch: ${cyan}${parents[$i]}${clr}"
+        prompt "Use it as target branch for PR?" && {
+          targetBranch=${parents[$i]};
+          break;
+        }
+    done
+fi
 
 descriptionFile=$(mktemp)
-PAGER= git log --format='format:%B' ${targetBranch}..${sourceBranch} > $descriptionFile
+PAGER= git log --format='format:%B' ${targetBranch}..${sourceBranch} > ${descriptionFile}
 mapfile -t commits < <(cat $descriptionFile)
 
 function askTitle() {
@@ -51,23 +62,23 @@ function askTitle() {
 function askDescription() {
     echo "${info}Suggesting description to be:"
     echo
-    cat $descriptionFile | sed 's/^/   /g'
+    cat ${descriptionFile} | sed 's/^/   /g'
     echo
     if prompt "Accept?"; then
         return 0
     else
-        $EDITOR $descriptionFile
+        ${EDITOR} ${descriptionFile}
     fi
 }
 
 if [[ "${#commits[@]}" == "1" ]]; then
     askTitle "${commits[@]}"
     title="${response}"
-    askDescription "${commits[@]}"
+    askDescription
 else
     askTitle "$(echo ${sourceBranch} | sed 's/[_\-]/ /g' | sed 's/\//\: /g')"
     title="${response}"
-    askDescription "${commits[@]}"
+    askDescription
 fi
 
 mapfile -t projectAndRepo < <(git remote get-url origin | tr '/' "\n" | tail -n2 | sed 's/\.git//g')
@@ -90,7 +101,7 @@ cat ${descriptionFile} | sed "s/^/      /g"
 echo
 
 function getPass() {
-    secret-tool lookup $LOGIN $USER
+    secret-tool lookup ${LOGIN} ${USER}
 }
 
 if prompt "Proceed?"; then
@@ -99,28 +110,31 @@ if prompt "Proceed?"; then
         echo "${info}Using script first time, huh?"
         echo "${info}Enter your password on stash"
         echo -n "${bright}${white}>>> ${clr}"
-        secret-tool store --label "Stash login" $LOGIN $USER
+        secret-tool store --label "Stash login" ${LOGIN} ${USER}
     fi
     pass=$(getPass)
 
     resultFile=$(mktemp)
     reviewersFile=$(mktemp)
+    requestFile=$(mktemp)
 
     jqShowURL="@uri "'"'"${REPO_URL}/projects/${project}/repos/${repo}/pull-requests/\\(.id)/overview"'"'
     jqShowErrors='(.errors | map("'"${error}"'\(.message) (Context: \(.context))"))[]'
 
-    echo
-
     repoId=$(http --auth "${LOGIN}:${pass}" -j "$API_URL/projects/${project}/repos/${repo}" | jq -r ".id")
-    http --auth "${LOGIN}:${pass}" -j "$REPO_URL/rest/default-reviewers/latest/projects/${project}/repos/${repo}/reviewers" sourceRepoId==${repoId} targetRepoId==${repoId} sourceRefId=="refs/heads/${sourceBranch}" targetRefId=="refs/heads/${targetBranch}" > $reviewersFile
+    mkprLogger.trace Got repo id: ${repoId}
 
-    mv $reviewersFile{,.tmp}
-    cat ${reviewersFile}.tmp | jq 'map(.name)' > $reviewersFile
+    http --auth "${LOGIN}:${pass}" -j "$REPO_URL/rest/default-reviewers/latest/projects/${project}/repos/${repo}/reviewers" sourceRepoId==${repoId} targetRepoId==${repoId} sourceRefId=="refs/heads/${sourceBranch}" targetRefId=="refs/heads/${targetBranch}" > ${reviewersFile}
+    cat ${reviewersFile} | mkprLogger.trace Got response with default reviewers:
+
+    mv ${reviewersFile}{,.tmp}
+    cat ${reviewersFile}.tmp | jq 'map({ user: { name: .name } })' > ${reviewersFile}
     rm -f ${reviewersFile}.tmp
+    cat ${reviewersFile} | mkprLogger.trace Parsed reviewers into:
 
     jo \
       title="${title}" \
-      description=@$descriptionFile \
+      description=@${descriptionFile} \
       state=OPEN \
       open=true \
       closed=false \
@@ -141,21 +155,30 @@ if prompt "Proceed?"; then
         ) \
       ) \
       locked=false \
-      reviewers=@${reviewersFile} \
-    | http --auth "${LOGIN}:${pass}" $API_URL/projects/${project}/repos/${repo}/pull-requests \
-    | jq -r 'if .id != null then ('"${jqShowURL}"') else ('"${jqShowErrors}"') end' \
-    > $resultFile
+      reviewers:=${reviewersFile} \
+    > ${requestFile}
 
-    if [[ "$(head -c1 $resultFile)" == "h" ]]; then
+    cat ${requestFile} | mkprLogger.debug About to send request to create PR:
+
+    cat ${requestFile} \
+    | http --auth "${LOGIN}:${pass}" ${API_URL}/projects/${project}/repos/${repo}/pull-requests \
+    | also-pipe-to mkprLogger.debug Got response from bitbucket: \
+    | jq -r 'if .id != null then ('"${jqShowURL}"') else ('"${jqShowErrors}"') end' \
+    > ${resultFile}
+
+    cat ${resultFile} | mkprLogger.trace Processed response to:
+
+    if [[ "$(head -c1 ${resultFile})" == "h" ]]; then
         echo "${info}Copying URL to pull-request to clipboard"
-        cat $resultFile | xsel -b
+        cat ${resultFile} | xsel -b
     else
-        cat $resultFile
+        cat ${resultFile}
     fi
 
-    rm -f $resultFile
-    rm -f $reviewersFile
+    rm -f ${resultFile}
+    rm -f ${reviewersFile}
+    rm -f ${requestFile}
 
 fi
 
-rm -f $descriptionFile
+rm -f ${descriptionFile}

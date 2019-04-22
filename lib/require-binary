@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+function has-bin() {
+    which ${1} &> /dev/null
+    return $?
+}
+
+function require-bin() {
+    has-bin ${1} || {
+        echo "${error}Required binary ${cyan}${1}${clr} not found!"
+        [[ n"${2}" != "n" ]] && echo "${info}You need to install package: ${cyan}${2}${clr}"
+        exit 2
+    }
+}
+
