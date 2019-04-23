@@ -5,4 +5,5 @@ git log --decorate --simplify-by-decoration --oneline \
       | head -n5 \
       | sed 's/.* (\(.*\)) .*/\1/' \
       | sed 's/\(.*\), .*/\1/' \
+      | sed 's/, origin\/.*$//g' \
       | sed 's/origin\///'
