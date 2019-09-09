@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+EXPECTED_GROUP=docker
+source /usr/local/etc/guard.sh
+
+COMMANDS_PATH=/usr/local/lib/docker-util
+
+source /usr/local/lib/command-loader

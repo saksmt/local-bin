@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+source /usr/local/lib/logging
+
+function checkRequirements() {
+    source /usr/local/lib/require-binary
+
+    require-bin jo jo
+    require-bin jq jq
+    require-bin http httpie
+    require-bin secret-tool libsecret
+}
+
+function loadConfigs() {
+    source /usr/local/etc/pr.conf
+
+    [[ n"$LOGIN" == "n" ]] && { echo "${error}No login specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
+    [[ n"${REPO_URL}" == "n" ]] && { echo "${error}No repo url specified. Please configure it in ${cyan}/usr/local/etc/pr.conf${clr}"; exit 1; }
+
+    export API_URL="${REPO_URL}/rest/api/1.0"
+}
+
+function checkIsInRepo() {
+    if ! [[ -d .git ]]; then
+        echo "${error}Not in repository root!"
+        exit 1
+    fi
+}
+
+function checkInSyncWithRemote() {
+    remoteRevision=$(git ls-remote origin ${1} | cut -f1)
+    localRevision=$(git show-ref --heads ${1} | cut -f1)
+
+    if [[ n"${localRevision}" == "n" ]]; then
+        echo "${error}There is no branch named ${cyan}${1}${clr}"
+        exit 1
+    fi
+
+    if [[ n"${remoteRevision}" == "n" ]]; then
+        echo "${error}Branch ${cyan}${1}${clr} is not present on remote"
+        echo "${info}Forgot to ${highlight}git push${clr}?"
+
+        exit 1
+    fi
+
+    if [[ "${remoteRevision}" != "${localRevision}" ]]; then
+        echo "${warning}Local version of branch ${cyan}${1}${clr} is not in sync with remote!"
+        return 1
+    fi
+
+    return 0
+}
+
+function checkDirtyState() {
+    if [[ "$(git status -s)" != "" ]]; then
+        echo "${warning}There are untracked changes!"
+        prompt "Continue?" || {
+            echo "${error}Aborting";
+            exit 1;
+        }
+    fi
+}
+
+true && \
+    checkRequirements && \
+    loadConfigs && \
+    checkIsInRepo && \
+    checkDirtyState && \
+
+mkLogger mkpr
+
+mapfile -t parents < <(git-parents)
+targetBranch=${1}
+
+sourceBranch=$(git rev-parse --abbrev-ref HEAD)
+
+if [[ n"${targetBranch}" == "n" ]]; then
+    for (( i=0; i < ${#parents[@]}; i++ )); do
+        echo "${info}Found parent branch: ${cyan}${parents[$i]}${clr}"
+        prompt "Use it as target branch for PR?" && {
+          targetBranch=${parents[$i]};
+          break;
+        }
+    done
+fi
+
+descriptionFile=$(mktemp)
+PAGER= git log --format='format:%B' ${targetBranch}..${sourceBranch} > ${descriptionFile}
+mapfile -t commits < <(cat $descriptionFile)
+
+function askTitle() {
+    echo "${info}Suggesting title to be ${cyan}${1}${clr}"
+    if prompt "Accept?"; then
+        response="${1}"
+    else
+        read -e -p "${bright}${white}>>>${clr} Type in your title: " -i "${1}" response
+    fi
+}
+
+function askDescription() {
+    echo "${info}Suggesting description to be:"
+    echo
+    cat ${descriptionFile} | sed 's/^/   /g'
+    echo
+    if prompt "Accept?"; then
+        return 0
+    else
+        ${EDITOR} ${descriptionFile}
+    fi
+}
+
+if [[ "${#commits[@]}" == "1" ]]; then
+    askTitle "${commits[@]}"
+    title="${response}"
+    askDescription
+else
+    askTitle "$(echo ${sourceBranch} | sed 's/[_\-]/ /g' | sed 's/\//\: /g')"
+    title="${response}"
+    askDescription
+fi
+
+mapfile -t projectAndRepo < <(git remote get-url origin | tr '/' "\n" | tail -n2 | sed 's/\.git//g')
+project=${projectAndRepo[0]}
+repo=${projectAndRepo[1]}
+
+function field() {
+    echo "   ${bright}${white}${1}${clr}: ${2}"
+}
+echo "${info}About to create PR:"
+echo
+field "Project" "${projectAndRepo[0]}"
+field "Repositoty" "${projectAndRepo[1]}"
+field "Source branch" "${sourceBranch}"
+field "Target branch" "${targetBranch}"
+field "Title" "${title}"
+echo "   ${bright}${white}Description${clr}:"
+echo
+cat ${descriptionFile} | sed "s/^/      /g"
+echo
+
+function getPass() {
+    secret-tool lookup ${LOGIN} ${USER}
+}
+
+if prompt "Proceed?"; then
+    pass=$(getPass)
+    if [[ n"$pass" == "n" ]]; then
+        echo "${info}Using script first time, huh?"
+        echo "${info}Enter your password on stash"
+        echo -n "${bright}${white}>>> ${clr}"
+        secret-tool store --label "Stash login" ${LOGIN} ${USER}
+    fi
+    pass=$(getPass)
+
+    resultFile=$(mktemp)
+    reviewersFile=$(mktemp)
+    requestFile=$(mktemp)
+
+    jqShowURL="@uri "'"'"${REPO_URL}/projects/${project}/repos/${repo}/pull-requests/\\(.id)/overview"'"'
+    jqShowErrors='(.errors | map("'"${error}"'\(.message) (Context: \(.context))"))[]'
+
+    repoId=$(http --auth "${LOGIN}:${pass}" -j "$API_URL/projects/${project}/repos/${repo}" | jq -r ".id")
+    mkprLogger.trace Got repo id: ${repoId}
+
+    http --auth "${LOGIN}:${pass}" -j "$REPO_URL/rest/default-reviewers/latest/projects/${project}/repos/${repo}/reviewers" sourceRepoId==${repoId} targetRepoId==${repoId} sourceRefId=="refs/heads/${sourceBranch}" targetRefId=="refs/heads/${targetBranch}" > ${reviewersFile}
+    cat ${reviewersFile} | mkprLogger.trace Got response with default reviewers:
+
+    mv ${reviewersFile}{,.tmp}
+    cat ${reviewersFile}.tmp | jq 'map({ user: { name: .name } })' > ${reviewersFile}
+    rm -f ${reviewersFile}.tmp
+    cat ${reviewersFile} | mkprLogger.trace Parsed reviewers into:
+
+    jo \
+      title="${title}" \
+      description=@${descriptionFile} \
+      state=OPEN \
+      open=true \
+      closed=false \
+      fromRef=$(jo \
+        id="refs/heads/${sourceBranch}" \
+        repository=$(jo \
+          slug="${repo}" \
+          name=null \
+          project\[key\]=${project} \
+        ) \
+      ) \
+      toRef=$(jo \
+        id="refs/heads/${targetBranch}" \
+        repository=$(jo \
+          slug=${repo} \
+          name=null \
+          project\[key\]=${project} \
+        ) \
+      ) \
+      locked=false \
+      reviewers:=${reviewersFile} \
+    > ${requestFile}
+
+    cat ${requestFile} | mkprLogger.debug About to send request to create PR:
+
+    cat ${requestFile} \
+    | http --auth "${LOGIN}:${pass}" ${API_URL}/projects/${project}/repos/${repo}/pull-requests \
+    | also-pipe-to mkprLogger.debug Got response from bitbucket: \
+    | jq -r 'if .id != null then ('"${jqShowURL}"') else ('"${jqShowErrors}"') end' \
+    > ${resultFile}
+
+    cat ${resultFile} | mkprLogger.trace Processed response to:
+
+    if [[ "$(head -c1 ${resultFile})" == "h" ]]; then
+        echo "${info}Copying URL to pull-request to clipboard"
+        cat ${resultFile} | xsel -b
+    else
+        cat ${resultFile}
+    fi
+
+    rm -f ${resultFile}
+    rm -f ${reviewersFile}
+    rm -f ${requestFile}
+
+fi
+
+rm -f ${descriptionFile}
+
+# Error json: {"errors":[{"context":null,"message":"Pull request creation was canceled.","exceptionName":"com.atlassian.bitbucket.pull.PullRequestOpenCanceledException","details":["Please rebase your branch on to the target branch before creating a pull request: git checkout feature/PAYOFF-1457_parallel-image-pulling; git rebase master; git push -f"]}]}
+# Another json: {"errors":[{"context":null,"message":"Repository IBUL/payoff doesn't have a refs/heads/feature/PAYOFF-1457_parallel-image-pulling ref.","exceptionName":"com.atlassian.bitbucket.repository.NoSuchBranchException"}]}

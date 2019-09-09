@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+function listNetworks() {
+    docker network list --format '{{.ID}};{{.Name}};{{.Driver}}' \
+      | grep -v host \
+      | grep -v none \
+      | grep -v "bridge;bridge" \
+      | grep -v "NETWORK" \
+      | cut -d ";" -f 1
+}
+
+function hasContainers() {
+    [[ "$(docker network inspect ${1} | jq '.[].Containers | length')" != '0' ]]
+}
+
+listNetworks | while read networkId; do
+    if ! hasContainers ${networkId}; then
+        docker network rm ${networkId}
+    fi
+done

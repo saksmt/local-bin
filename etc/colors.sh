@@ -21,4 +21,10 @@ success=" ${green}*${clr} "
 error=" ${red}*${clr} "
 warning=" ${yellow}*${clr} "
 
-listItem="  ${bright}${white}-${clr}"
+highlight="${bright}${white}"
+
+listItem="  ${highlight}-${clr}"
+
+function codeBlock() {
+    echo "  > ${highlight}${@}${clr}"
+}

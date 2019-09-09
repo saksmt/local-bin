@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+echo -n 'Password: '
+hashedPassword=$(read -s password; echo -n ${password} | sha1sum | awk '{print toupper($1)}')
+foundHash=$(curl -s https://api.pwnedpasswords.com/range/${hashedPassword:0:5} | grep ${hashedPassword:5})
+hashCount=$(echo ${foundHash} | grep -Po "\:\d+" | tail -c +2)
+
+echo -ne "\r"
+if [[ "$hashCount" != "" ]] && [[ "$hashCount" != "0" ]]; then
+    echo "${error}Pwned in $hashCount accounts"
+else echo "${success}Secure!"; fi
