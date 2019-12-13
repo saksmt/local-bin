@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+function printOpts() {
+    placeholder=
+    if [[ n"${P}" != "n" ]]; then
+        placeholder=" ${cyan}{${clr}${highlight}${P}${clr}${cyan}}${clr}"
+    fi
+
+    echo -n "${highlight}${1}${clr}${placeholder}"
+    shift
+    for opt in ${@}; do
+        echo -n ", ${highlight}${opt}${clr}${placeholder}"
+    done
+}
+
+function printCommands() {
+    echo -n "${cyan}<${clr}${highlight}${1}${clr}"
+    shift
+    for c in ${@}; do
+        echo -n "${cyan}|${clr}${highlight}${c}${clr}"
+    done
+    echo -n "${cyan}>${clr}"
+}
