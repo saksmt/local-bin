@@ -12,6 +12,7 @@ brown="${esc}[33m"
 blue="${esc}[34m"
 violet="${esc}[35m"
 cyan="${esc}[36m"
+gray="${esc}[90m"
 white="${esc}[37m"
 
 yellow="${bright}${brown}"

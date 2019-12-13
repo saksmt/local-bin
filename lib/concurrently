@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+function concurrently() {
+
+  FORK_LIMIT=${1:-5}
+  JOB_NAME=${2:-'executing'}
+  lineWidth=$(($(echo ${JOB_NAME} | wc -c) + 25))
+
+  progress=$(mktemp -d)
+  mkdir ${progress}/{active,completed}
+
+  (
+    progressIndicator=...
+    while [[ ! -f ${progress}/finished ]] || [[ $(ls -1 ${progress}/active | wc -l) > 0 ]]; do
+        case ${progressIndicator} in
+          "." ) progressIndicator=".." ;;
+          ".." ) progressIndicator="..." ;;
+          "..." ) progressIndicator=" " ;;
+          * ) progressIndicator="." ;;
+        esac
+        printf "${highlight}>${clr} [ ${highlight}%2d${clr} ${gray}/${clr} ${highlight}%2d${clr} ${gray}//${clr} ${highlight}%3d${clr} ]: ${JOB_NAME}%-3s\r" \
+              $(ls -1 ${progress}/active | wc -l) \
+              ${FORK_LIMIT} \
+              $(ls -1 ${progress}/completed | wc -l) \
+              "${progressIndicator}"
+        sleep 0.3s
+    done
+  ) &
+
+  while read nextJob; do
+      if [[ $(ls -1 ${progress}/active | wc -l) -ge ${FORK_LIMIT} ]]; then
+          wait -n
+      fi
+      printf "%${lineWidth}s\r" ' '
+      echo "${highlight}>${clr} starting: ${highlight}${nextJob}${clr}"
+      (
+        processId=$(uuidgen)
+        touch ${progress}/active/${processId}
+        eval ${nextJob}
+        mv ${progress}/{active,completed}/${processId}
+      ) &
+  done
+
+  touch ${progress}/finished
+
+  wait
+
+  rm -rf ${progress}
+}
