@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/require-binary
+source /usr/local/lib/help-utils
+source /usr/local/lib/prompt
+
+require-bin gpg
+
+
+SCRATCHES_DIR="$(readlink -f ~)/.private-scratches"
+FILE_MAP="${SCRATCHES_DIR}/.filemap"
+SCRATCHES_PASSWORD=
+
+function encrypt() {
+    gpg -c --quiet --yes --pinentry-mode loopback --passphrase "${1}" --no-tty --trust-model always
+}
+
+function decrypt() {
+    gpg -d --quiet --yes --pinentry-mode loopback --passphrase "${1}" --no-tty
+}
+
+function askPass() {
+    if [[ n"${SCRATCHES_PASSWORD}" == n ]]; then
+        echo "${info}Enter password: "
+        echo -n "${highlight} > ${clr}"
+        read -s pass
+        echo
+
+        if ! [ -f ${FILE_MAP} ]; then
+            echo "${info}Private scratches weren't initialized yet"
+            prompt "Do you want to initialize private scratches with given password?" && {
+                if [[ n"${pass}" == n ]]; then
+                    echo "${error}Password can not be empty!" >&2
+                    exit 1
+                fi
+                echo "${info}Repeat password:"
+                echo -n "${highlight} > ${clr}"
+                read -s pass2
+                echo
+
+                if [[ "${pass}" != "${pass2}" ]]; then
+                    echo "${error}Passwords did not match!" >&2
+                    pass=
+                    pass2=
+                    exit 1
+                fi
+                SCRATCHES_PASSWORD="${pass}"
+                pass=
+                pass2=
+                echo -n | encrypt "${SCRATCHES_PASSWORD}filemap" > ${FILE_MAP} && \
+                    echo "${success}Initialized private scratches!"
+            }
+        else
+            SCRATCHES_PASSWORD="${pass}"
+            pass=
+            getFileMap >/dev/null || {
+                echo "${error}Incorrect password" >&2
+            }
+        fi
+    fi
+}
+
+function getFileMap() {
+    cat ${FILE_MAP} | decrypt "${SCRATCHES_PASSWORD}filemap"
+}
+
+function saveFileMap() {
+    encrypt "${SCRATCHES_PASSWORD}filemap" > ${FILE_MAP}.new
+    mv -f ${FILE_MAP}.new ${FILE_MAP}
+}
+
+function fileName() {
+    askPass
+
+    base64FileName=$(echo -n ${1} | base64 -w0)
+    storedFileName=$(getFileMap | grep -F "${base64FileName}")
+
+    if [[ n"${storedFileName}" == n ]]; then
+        fileId="$(uuidgen)"
+        storedFileName="${fileId//"-"/""}:${base64FileName}"
+
+         getFileMap | cat - <(echo ${storedFileName}) | saveFileMap
+    fi
+
+    echo "${storedFileName}" | cut -d: -f1
+}
+
+function listScratches() {
+    askPass
+
+    echo "${info}You have $(ls ${SCRATCHES_DIR} -1 | wc -l) private scratches:"
+    for file in $(getFileMap); do
+        echo -n "${listItem} "
+        echo -n $file | cut -d: -f2 | base64 -d
+        echo
+    done
+}
+
+function mkTmpFile() {
+    fileName=$(mktemp)
+    trap 'rm -f "${fileName}"' TERM INT EXIT KILL
+    echo -n "${fileName}"
+}
+
+function openScratch() {
+    askPass
+
+    if [[ n"$1" == n ]]; then
+        echo "${info}What scratch do you want to edit/create?"
+        echo -n "${highlight} > ${clr}"
+        read -s fileName
+        echo
+    else
+        fileName="${1}"
+    fi
+
+    encFileName="${SCRATCHES_DIR}/$(fileName "${fileName}")"
+    tempFile=$(mkTmpFile)
+
+    if [[ -f "${encFileName}" ]]; then
+        cat "${encFileName}" | decrypt "${SCRATCHES_PASSWORD}" > ${tempFile}
+    fi
+
+    ${EDITOR:-vim} "${tempFile}"
+    cat "${tempFile}" | encrypt "${SCRATCHES_PASSWORD}" > ${encFileName}
+}
+
+function deleteScratch() {
+    askPass
+
+    if [[ n"$1" == n ]]; then
+        echo "${info}What scratch do you want to delete?"
+        echo -n "${highlight} > ${clr}"
+        read -s fileName
+        echo
+    else
+        fileName="${1}"
+    fi
+
+    base64FileName=$(echo -n ${1} | base64 -w0)
+    storedFileName=$(getFileMap | grep -F "${base64FileName}")
+
+    if [[ n"$storedFileName" != "n" ]]; then
+        rm -f "$SCRATCHES_DIR/$(echo "${storedFileName}" | cut -d: -f1)" &>/dev/null
+        getFileMap | grep -vF "${base64FileName}" | saveFileMap
+    fi
+    echo "${success}Deleted ${highlight}${fileName}${clr}"
+}
+
+function printHelp() {
+    echo "private-scratch $(usage.commands list open delete)"
+    echo
+    echo "  $(description.commands list ls l) - list existing scratches"
+    echo "  $(description.commands open edit e o) [${highlight}NAME${clr}] - create or edit scratch with given ${highlight}NAME${clr}, if name not present - ask it interactively"
+    echo "  $(description.commands delete rm d) [${highlight}NAME${clr}] - delete scratch with given ${highlight}NAME${clr}, if name not present - ask interactively"
+    echo
+}
+
+
+mkdir -p ${SCRATCHES_DIR} &>/dev/null
+case "${1}" in
+    list | ls | l ) listScratches ;;
+    open | edit | e | o ) openScratch "${2}" ;;
+    delete | rm | d ) deleteScratch "${2}" ;;
+    help | h | * ) printHelp ;;
+esac

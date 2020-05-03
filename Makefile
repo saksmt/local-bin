@@ -21,6 +21,7 @@ SRC_BIN = bin/buildkernel \
           bin/touchpad \
           bin/mkpr \
           bin/git-parents \
+		  bin/private-scratch \
           bin/is-pwned \
 					bin/docker-util
 
