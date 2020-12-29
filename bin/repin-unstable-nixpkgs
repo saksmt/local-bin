@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#! nix-shell -i bash -p nix-prefetch-github git
+#! nix-shell --quite -i bash -p nix-prefetch-github git
 
 source /usr/local/etc/colors.sh
 source /usr/local/etc/guard.sh
@@ -16,7 +16,7 @@ if [[ n"${lastUpdated}" == n ]]; then
 fi
 sinceUpdate=$(( $(date +%s) - ${lastUpdated} ))
 
-if [[ ${sinceUpdate} < ${UPDATE_THRESHOLD_IN_SECONDS} ]]; then
+if [[ ${sinceUpdate} -lt ${UPDATE_THRESHOLD_IN_SECONDS} ]]; then
   echo "${info}Not enough time passed since last re-pin, skipping..."
   exit 0
 fi
