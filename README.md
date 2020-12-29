@@ -2,6 +2,8 @@
 
 Some scripts born while using gentoo & nixos
 
+Since some of the scripts are related to NixOS here is a [link](https://github.com/saksmt/nix-config) to my NixOS configuration
+
 ## Installation
 
 ```bash
