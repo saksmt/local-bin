@@ -1,0 +1,37 @@
+#!/usr/bin/env nix-shell
+#! nix-shell -i bash -p nix-prefetch-github git
+
+source /usr/local/etc/colors.sh
+source /usr/local/etc/guard.sh
+
+NIXPKGS_OWNER="NixOS"
+NIXPKGS_REPO="nixpkgs"
+NIXPKGS_REF="nixpkgs-unstable"
+UPDATE_THRESHOLD_IN_SECONDS="600" # 10 minutes
+
+currentRevisionFile="/etc/nixos/.nixpkgs.revision"
+lastUpdated=$(stat -c %Y ${currentRevisionFile} 2>/dev/null)
+if [[ n"${lastUpdated}" == n ]]; then
+  lastUpdated="0"
+fi
+sinceUpdate=$(( $(date +%s) - ${lastUpdated} ))
+
+if [[ ${sinceUpdate} < ${UPDATE_THRESHOLD_IN_SECONDS} ]]; then
+  echo "${info}Not enough time passed since last re-pin, skipping..."
+  exit 0
+fi
+
+echo "${info}Fetching info about latest revision of nixpkgs..."
+
+latestRevision=$(git ls-remote https://github.com/${NIXPKGS_OWNER}/${NIXPKGS_REPO}.git ${NIXPKGS_REF} | cut -f1 2>/dev/null)
+touch ${currentRevisionFile} &>/dev/null
+currentRevision=$(<${currentRevisionFile})
+
+if [[ "${latestRevision}" == "${currentRevision}" ]]; then
+  echo "${success}Already up to date!"
+else
+  echo "${info}Pinning new revision (${highlight}${latestRevision}${clr})"
+  nix-prefetch-github --nix --rev ${latestRevision} ${NIXPKGS_OWNER} ${NIXPKGS_REPO} > /etc/nixos/.unstable-nixpkgs.nix
+  echo ${latestRevision} > ${currentRevisionFile}
+  echo "${success}Done"
+fi

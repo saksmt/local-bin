@@ -21,6 +21,7 @@ info=" ${cyan}*${clr} "
 success=" ${green}*${clr} "
 error=" ${red}*${clr} "
 warning=" ${yellow}*${clr} "
+warn=" ${yellow}*${clr} "
 
 highlight="${bright}${white}"
 

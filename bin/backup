@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+DEFAULT_CONFIG_PATH="/usr/local/etc/backup.cfg"
+DEFAULT_BACKUP_PATH="./backup.tgz"
+
+configPath=
+backupPath=
+mode=help
+verbosity=normal
+
+function trim() {
+  line="${@}"
+  line="${line##*( )}" # trim start
+  line="${line%%*( )}" # trim end
+  echo "${line}"
+}
+
+function isEmptyOrComment() {
+  line="${@}"
+  [[ n"${line}" == "n" ]] || [[ "${line:0:1}" == "#" ]]
+}
+
+function expandPath() {
+  if [[ "${1:0:1}" == "~" ]]; then
+    eval "echo $(printf "~%q" "${1:1}")"
+  else
+    echo ${1}
+  fi
+}
+
+function storeFile() {
+  to="${1}"
+  fileToStore="${2}"
+  what="$(readlink -f "$(expandPath "${fileToStore}")")"
+
+  mkdir -p "${to}/$(dirname "${what}")" &>/dev/null
+
+  if [ -L "${fileToStore}" ]; then
+    echo "${warn}Found symbolic link in backup tree (${highlight}${fileToStore}${clr} ${cyan}=>${clr} ${highlight}${what}${clr})! Skipping..." >&2
+  elif [ -d "${what}" ]; then
+    echo "${info}Saving directory ${highlight}${fileToStore}${clr}"
+    find "${what}" -type f | { while IFS= read file; do storeFile "${to}" "${file}"; done }
+  elif [ -e "${what}" ]; then
+    if [[ "${verbosity}" == "debug" ]]; then
+      echo "${info}Saving ${highlight}${fileToStore}${clr}"
+    fi
+    cp "${what}" "${to}/$(dirname "${what}")" || {
+      echo "${error}Failed to backup file (${highlight}${fileToStore}${clr})" >&2
+      exit 1
+    }
+  else
+    echo "${warn}File (${highlight}${fileToStore}${clr}) requested to be backed up does not exist!" >&2
+  fi
+}
+
+function createBackup() {
+  [[ n"${configPath}" == "n" ]] && {
+    echo "${warn}Using default config path (${highlight}${DEFAULT_CONFIG_PATH}${clr}) since none given"
+    configPath="${DEFAULT_CONFIG_PATH}"
+  }
+
+  [[ n"${backupPath}" == "n" ]] && {
+    echo "${warn}Using default output path for backup (${highlight}${DEFAULT_BACKUP_PATH}${clr}) since none given"
+    backupPath="${DEFAULT_BACKUP_PATH}"
+  }
+
+  [ -f "${configPath}" ] || {
+    echo "${error}Config does not exist!"
+    exit 1
+  }
+
+  compressor=gzip
+  if command -v pigz &>/dev/null; then
+    compressor=pigz
+  fi
+
+  backupRoot="$(mktemp -dt backup.tmp.XXXXXXXX)"
+  backupDir="${backupRoot}/backup"
+  cat "${configPath}" | {
+    while IFS= read configLine; do
+      sanitized="$(trim "${configLine}")"
+      if isEmptyOrComment "${sanitized}"; then
+        continue
+      elif [[ "${sanitized:0:1}" == "!" ]]; then
+        { eval "${sanitized:1}" || exit 1; } | { while IFS= read fileLine; do storeFile "${backupDir}" "${fileLine}"; done }
+      else
+        storeFile "${backupDir}" "${sanitized}"
+      fi
+    done
+  }
+
+  echo "${info}Creating archive..."
+
+  tar -I ${compressor} -f "${backupPath}" -C "${backupDir}" -c .
+  rm -rf "${backupRoot}" &>/dev/null
+  echo "${info}Done"
+}
+
+while [[ $# != 0 ]]; do
+  case "${1}" in
+    apply | restore | --apply | --restore | install | --install )
+      mode=install
+      shift
+      ;;
+    create | --create )
+      mode=create
+      shift
+      ;;
+    help | --help | -h )
+      mode=help
+      shift
+      ;;
+    -c | --config )
+      shift
+      configPath="${1}"
+      shift
+      ;;
+    -b | --backup | -f | --file | -p | --path | -o | --output )
+      shift
+      backupPath="${1}"
+      shift
+      ;;
+    -d | -v )
+      shift
+      verbosity=debug
+      ;;
+    * )
+      echo "${error}Unknown option: ${highlight}${1}${clr}"
+      exit -1
+  esac
+done
+
+case "${mode}" in
+  install ) installBackup ;;
+  create ) createBackup ;;
+  * ) showHelp ;;
+esac

@@ -13,6 +13,7 @@ if [[ n"${EXPECTED_USER}" == "n" ]] && [[ n"$(groups | grep "${EXPECTED_GROUP}")
     echo "$(codeBlock "sudo -u someUserWithAccessTo${EXPECTED_GROUP} !!")"
     echo "${info}Or just run as root:"
     echo "$(codeBlock "sudo !!")"
+    exit 1
 fi
 
 if [[ n"${EXPECTED_USER}" != "n" ]] && [[ "${EXPECTED_USER}" != "${USER}" ]]; then
@@ -23,4 +24,5 @@ if [[ n"${EXPECTED_USER}" != "n" ]] && [[ "${EXPECTED_USER}" != "${USER}" ]]; th
     echo "$(codeBlock "sudo -u someUserWithAccessTo${EXPECTED_GROUP} !!")"
     echo "${info}Or just run as root:"
     echo "$(codeBlock "sudo !!")"
+    exit 1
 fi

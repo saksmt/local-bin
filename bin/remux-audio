@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+video="${1}"
+audio="${2}"
+
+function locateAudio() {
+  local baseName="$(basename "${1}")"
+  local nameWithoutExt="${baseName%.*}"
+  local dir="$(dirname "${1}")"
+
+  echo $baseName >&2
+  echo $nameWithoutExt >&2
+  echo $dir >&2
+
+  local candidate="$(ls -1 "${dir}" | grep -Fw "${nameWithoutExt}" | grep -Fxv "${baseName}")"
+  if [[ n"${candidate}" == "n" ]]; then
+    echo 'TODO: search in child directories' >&2
+    exit 1
+  fi
+  echo "${dir}/${candidate}"
+}
+
+[[ n"${video}" == "n" ]] && {
+  echo "${error}usage: remux-audio <video-file> [audio-file]";
+  exit 1;
+}
+
+[[ -f "${video}" ]] || {
+  echo "${error}No such file ${highlight}${video}${clr}";
+  exit 1;
+}
+
+if [[ n"${audio}" == "n" ]]; then
+  audio=$(locateAudio "${video}") || exit 1
+fi
+
+[[ -f "${audio}" ]] || {
+  echo "${error}No such file ${highlight}${audio}${clr}";
+  exit 1;
+}
+
+ffmpeg -i "${video}" -i "${audio}" -c copy -map 0 -map 1:a "${video%.*}.muxed.${video##*.}"
