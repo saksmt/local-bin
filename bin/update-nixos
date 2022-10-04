@@ -1,0 +1,75 @@
+#!/usr/bin/env nix-shell
+#! nix-shell --quiet -i bash -p awscli2
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+source /usr/local/etc/guard.sh
+
+toVersion="${1}"
+
+function versionFromUrl() {
+  grep -oP 'nixos-\d{2}.\d{2}' | cut -d- -f2
+}
+
+function listChannelVersions() {
+  aws --no-sign-request s3api list-objects --bucket=nix-channels --query 'Contents[].{Key: Key}' --prefix=nixos --output text | grep -v / | versionFromUrl | sort -ru
+}
+
+if [[ n"${toVersion}" == n ]]; then
+  echo "${info}Searching for latest nixos version"
+  toVersion=$(listChannelVersions | head -n1)
+  echo "${info}Latest version is: ${toVersion}"
+else
+  code=$(curl -Ls -o /dev/null https://nixos.org/channels/nixos-${toVersion} -w '%{http_code}')
+
+  [[ "${code}" == "200" ]] || {
+    echo "${error}Version ${toVersion} does not exist";
+    exit -1;
+  }
+fi
+
+currentVersion=$(nix-channel --list | versionFromUrl)
+
+if [[ "${currentVersion}" == "${toVersion}" ]]; then
+  echo "${success}Already using latest channel"
+  exit 0
+fi
+
+echo "${info}Updating to ${toVersion}"
+
+declare -a configFileAndLines
+
+function searchVersionInConfig() {
+  grep -HnRP 'stateVersion\s*=\s*("|'"'"'{1,2})'"${1:0:2}\.${1:3:2}"'("|'"'"'{1,2})' /etc/nixos | cut -d: -f1-2
+}
+
+readarray -t configFileAndLines < <(searchVersionInConfig ${currentVersion})
+
+if [[ "${#configFileAndLines}" == "0" ]]; then
+  readarray -t alreadyUpdated < <(searchVersionInConfig ${toVersion})
+  if [[ ${#alreadyUpdated} == 0 ]]; then
+    echo "${warn}Can't find system.stateVersion to update"
+    echo "${info}Searched only for ${dim}stateVersion = ${currentVersion}${clr} and ${dim}stateVersion = ${toVersion}${clr}. Maybe it was updated manually or differed from nix-channel"
+    prompt "Proceed anyway?" || exit 1
+  fi
+fi
+
+for f in ${configFileAndLines[@]}; do
+  file=$(echo ${f} | cut -d: -f1)
+  line=$(echo ${f} | cut -d: -f2)
+
+  echo "${info}Found nixos version In file ${dim}${file}${clr}:"
+  nl -b a ${file} | sed -n "$(( $line - 1 )),$(( line + 1 ))p" | grep --color=always -E '^|'"${currentVersion:0:2}\.${currentVersion:3:2}"
+  prompt "Proceed to replace with new version?" || continue
+
+  sed -i "${line} s#${currentVersion:0:2}\.${currentVersion:3:2}#${toVersion}#g" $file
+done
+
+
+echo "${info}Setting up channels"
+nix-channel --add https://nixos.org/channels/nixos-${toVersion} nixos
+nix-channel --add https://nixos.org/channels/nixpkgs-${toVersion}-darwin nixpkgs
+
+echo "${success}Done. Ensure that your configuration contains correct state version and proceed with nix-channel --update and nixos-rebuild"
+
+

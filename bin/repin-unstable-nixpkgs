@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#! nix-shell --quite -i bash -p nix-prefetch-github git
+#! nix-shell --quiet -i bash -p nix-prefetch-github git
 
 source /usr/local/etc/colors.sh
 source /usr/local/etc/guard.sh

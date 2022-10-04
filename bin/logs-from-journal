@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+if [[ n"${1}" == n ]]; then
+  sudo journalctl -e -o verbose --output-fields=EXN_STACKTRACE,EXN_NAME,EXN_MESSAGE,LOGGER_NAME,MESSAGE
+else
+  sudo journalctl -e -t "${1}" -o verbose --output-fields=EXN_STACKTRACE,EXN_NAME,EXN_MESSAGE,LOGGER_NAME,MESSAGE
+fi

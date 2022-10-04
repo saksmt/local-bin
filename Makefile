@@ -21,12 +21,13 @@ SRC_BIN = bin/buildkernel \
           bin/touchpad \
           bin/mkpr \
           bin/git-parents \
-		  bin/private-scratch \
+          bin/private-scratch \
           bin/is-pwned \
           bin/docker-util \
           bin/remux-audio \
           bin/backup \
-          bin/repin-unstable-nixpkgs
+          bin/repin-unstable-nixpkgs \
+          bin/update-nixos
 
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf.tpl
 SRC_SHARE = usr/share/font_8x16.c
