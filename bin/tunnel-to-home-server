@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+shopt -s extglob
+
+port=${1}
+
+resultPort=
+case "${port}" in
+  "torrent" | "torrents" | "transmission" ) resultPort=9091 ;;
+  "proxy" ) resultPort=9898 ;;
+  +([[:digit:]]) ) resultPort=${port} ;;
+  '') echo "${error}Usage: tunnel-to-home-server <PORT|PORT-NAME> [TARGET-PORT]";
+      echo "${info}Available port names: transmission, proxy"
+      echo "${debug}Target port is a port bound on this pc to PORT on the server";
+      exit 0;
+  ;;
+  *) echo "${error}Invalid port: ${port}"; exit 1; ;;
+esac
+
+targetPort=${2:-${resultPort}}
+
+portMessage=
+
+if [[ "${resultPort}" == "${port}" ]]; then
+  portMessage="port ${resultPort}"
+else
+  portMessage="${port} port (${resultPort})"
+fi
+
+if [[ n"${2}" != n ]]; then
+  targetPortSuffix=":${targetPort}"
+fi
+
+echo "${info}Forwarding ${portMessage} of home server to localhost${targetPortSuffix}"
+echo -n "${info}Press ${highlight}C-c${clr} to terminate..."
+
+ssh -N -L localhost:${targetPort}:localhost:${resultPort} home.saksmt.dev
+

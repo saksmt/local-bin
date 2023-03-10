@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+
+git stash apply
+statusWas=$?
+
+if [[ "$statusWas" != "0" ]]; then
+    echo "${error}Failed to apply changes"
+fi
+
+if [[ "$statusWas" == "128" ]] || [[ "$statusWas" == "0" ]]; then
+    git stash drop
+    exit 0
+fi
+
+if prompt "Abort?"; then
+    echo "${info}Aborting..."
+    git reset HEAD --hard
+else
+    echo "${info}Don't forget to run ${cyan}gstd${clr} after conflict resolution"
+fi
+
