@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+weeks=0
+days=0
+hours=0
+minutes=0
+seconds=0
+millis=0
+
+input="${1}"
+
+if ! [[ "${input}" =~ ^[0-9]+$ ]]; then
+  echo "${error}Broken input: non numeric ms - ${input}" >&2;
+  exit 1
+fi
+
+secondsM=1000
+minutesM=$(( ${secondsM} * 60 ))
+hoursM=$(( ${minutesM} * 60 ))
+daysM=$(( ${hoursM} * 24 ))
+weeksM=$(( ${daysM} * 7 ))
+
+weeks=$(( ${input} / ${weeksM} ))
+input=$(( ${input} - ${weeks} * ${weeksM} ))
+
+days=$(( ${input} / ${daysM} ))
+input=$(( ${input} - ${days} * ${daysM} ))
+
+hours=$(( ${input} / ${hoursM} ))
+input=$(( ${input} - ${hours} * ${hoursM} ))
+
+minutes=$(( ${input} / ${minutesM} ))
+input=$(( ${input} - ${minutes} * ${minutesM} ))
+
+seconds=$(( ${input} / ${secondsM} ))
+input=$(( ${input} - ${seconds} * ${secondsM} ))
+
+millis=${input}
+
+out=
+
+[[ ${weeks} != 0 ]] && out="${out}${weeks}w "
+[[ "${PRECISION}" == w ]] && echo $out && exit 0
+
+[[ ${days} != 0 ]] && out="${out}${days}d "
+[[ "${PRECISION}" == d ]] && echo $out && exit 0
+
+[[ ${hours} != 0 ]] && out="${out}${hours}h "
+[[ "${PRECISION}" == h ]] && echo $out && exit 0
+
+[[ ${minutes} != 0 ]] && out="${out}${minutes}m "
+[[ "${PRECISION}" == m ]] && echo $out && exit 0
+
+[[ ${seconds} != 0 ]] && out="${out}${seconds}s "
+[[ "${PRECISION}" == s ]] && echo $out && exit 0
+
+[[ ${millis} != 0 ]] && out="${out}${millis}ms "
+
+echo $out

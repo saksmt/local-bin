@@ -29,6 +29,10 @@ SRC_BIN = bin/buildkernel \
           bin/repin-unstable-nixpkgs \
           bin/tunnel-to-home-server \
           bin/better-git-stash-pop \
+          bin/continually \
+          bin/duration-to-millis \
+          bin/millis-to-duration \
+          bin/countdown \
           bin/update-nixos
 
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf.tpl

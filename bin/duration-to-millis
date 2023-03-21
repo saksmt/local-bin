@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+
+weeks=0
+days=0
+hours=0
+minutes=0
+seconds=0
+millis=0
+
+currentValue=
+
+while [[ $# > 0 ]]; do
+  numerical=$(echo "${1}" | grep -Po '^\d+')
+  unit=${1:${#numerical}}
+  unit=$(echo "${unit}" | tr -d ' ')
+  currentValue="${currentValue}${numerical}"
+  shift
+  if [[ n"${currentValue}" == n ]]; then
+    if [[ n"${unit}" == n ]]; then
+      continue
+    else
+      echo "${error}Broken duration: unit without value!" >&2
+      exit 1
+    fi
+  else
+    case "${unit}" in
+      ms | milli | millis | millisecond | milliseconds )
+        millis=$(( ${millis} + ${currentValue} ))
+        ;;
+      s | second | seconds )
+        seconds=$(( ${seconds} + ${currentValue} ))
+        ;;
+      m | minute | minutes )
+        minutes=$(( ${minutes} + ${currentValue} ))
+        ;;
+      h | hour | hours )
+        hours=$(( ${hours} + ${currentValue} ))
+        ;;
+      d | day | days )
+        days=$(( ${days} + ${currentValue} ))
+        ;;
+      w | week | weeks )
+        weeks=$(( ${weeks} + ${currentValue} ))
+        ;;
+      '')
+        continue
+        ;;
+      * )
+        echo "${error}Broken duration: unknown unit - ${unit}" >&2;
+        exit 1
+        ;;
+    esac
+    currentValue=
+  fi
+done
+
+if [[ n"${currentValue}" != n ]]; then
+  echo "${error}Broken duration: unit unspecified" >&2;
+  exit
+fi
+
+days=$(( ${days} + ${weeks} * 7 ))
+hours=$(( ${hours} + ${days} * 24 ))
+minutes=$(( ${minutes} + ${hours} * 60 ))
+seconds=$(( ${seconds} + ${minutes} * 60 ))
+millis=$(( ${millis} + ${seconds} * 1000 ))
+
+echo ${millis}

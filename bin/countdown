@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+export PRECISION=${PRECISION:-s}
+
+# usage example:
+#
+#   duration=$(\
+#    ffprobe -v error -of jsono -show_format music/Europe\ -\ Final\ Countdown.flac \
+#      jq '(.format.duration | tonumber * 1000) | floor'
+#   )
+#   countdown ${duration} ms & { \
+#     ffplay music/Europe\ -\ Final\ Countdown.flac &>/dev/null;
+#   }
+#
+
+betweenIterationsMS=$(duration-to-millis ${RESOLUTION:-'150 ms'})
+betweenIterationsS=$(( ${betweenIterationsMS} / 1000 ))
+betweenIterationsMSRemainder=$(( ${betweenIterationsMS} - ${betweenIterationsS} * 1000 ))
+
+betweenIterations="${betweenIterationsS}.$(printf '%.3d' ${betweenIterationsMSRemainder})"
+
+timeLeft=$(duration-to-millis "${@}") || exit 1
+
+defaultPrintCommand="echo -ne '                              \r'; echo -ne \${PREFIX}%s"'"\r"'
+PRINT_WITH="${PRINT_WITH:-${defaultPrintCommand}}"
+
+while (( ${timeLeft} > 0 )); do
+  leftHumane=$(millis-to-duration $timeLeft)
+  printCommand="$(printf "${PRINT_WITH}" '${leftHumane:-...}' )"
+#  echo "${printCommand}"
+#  echo
+  eval -- "${printCommand}"
+  sleep ${betweenIterations}
+  timeLeft=$(( ${timeLeft} - ${betweenIterationsMS} ))
+done
