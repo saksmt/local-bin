@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/etc/guard.sh
+
+targetBrightness=$(echo "${1}" | grep -Po '^\d+$')
+
+if [[ n"${targetBrightness}" == n ]]; then
+  echo "usage: ${highlight}brightness${clr} <PERCENT>"
+else
+  max=$(cat /sys/class/backlight/intel_backlight/max_brightness)
+  target=$(( ${max} / 100 * $(max 1 $(min 100 ${targetBrightness})) ))
+  echo "${target}" > /sys/class/backlight/intel_backlight/brightness
+fi

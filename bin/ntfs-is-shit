@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/prompt
+
+# replacement table:
+#   "<" --> "("
+#   ">" --> ")"
+#   ":" --> "-"
+#   """ --> "'"
+#   "\" --> ";" (biased)
+#   "|" --> "." (biased)
+#   "?" --> "" (biased)
+#   "*" --> "#" (biased)
+#   "." (at the end) -> "._"
+#   " " (at the end) -> ""
+
+echo "${info}You're about to adapt all directories/files/subdirectories of ${highlight}${1}${clr} to be compatible with NTFS"
+echo "${warn}THIS IS DESTRUCTIVE ACTION"
+prompt "Proceed?" inverse || exit 1
+
+find "${1}" -depth -exec /usr/local/lib/sanitize-for-ntfs {} \;
+
+duplicates=$(mktemp)
+
+find "${1}" \
+| tr '[:upper:]' '[:lower:]' \
+| sort \
+| uniq -c \
+| grep -vP '^\s*1\s+' \
+| sed -r 's/^\s+([0-9]+)\s+(.*?)$/'"${listItem} ${yellow}"'\2'${clr}' [\1 occurrences]/' \
+> ${duplicates}
+
+if [[ "$(cat "${duplicates}" | wc -l)" != "0" ]]; then
+  echo "${error}WARNING: NTFS IS NOT CASE SENSITIVE FILE SYSTEM. FOUND DUPLICATES AFTER LOWERCASING:"
+  cat "${duplicates}"
+  rm -f "${duplicates}"
+fi

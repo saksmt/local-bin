@@ -41,20 +41,35 @@ millis=${input}
 
 out=
 
+function display() {
+  if [[ n"${out}" == n ]]; then
+    echo -n 'less than '
+    [[ "${PRECISION}" == w ]] && echo a week && exit 0
+    [[ "${PRECISION}" == d ]] && echo a day && exit 0
+    [[ "${PRECISION}" == h ]] && echo an hour && exit 0
+    [[ "${PRECISION}" == m ]] && echo a minute && exit 0
+    [[ "${PRECISION}" == s ]] && echo a second && exit 0
+    echo a millisecond
+  else
+    echo ${out}
+  fi
+  exit 0
+}
+
 [[ ${weeks} != 0 ]] && out="${out}${weeks}w "
-[[ "${PRECISION}" == w ]] && echo $out && exit 0
+[[ "${PRECISION}" == w ]] && display
 
 [[ ${days} != 0 ]] && out="${out}${days}d "
-[[ "${PRECISION}" == d ]] && echo $out && exit 0
+[[ "${PRECISION}" == d ]] && display
 
 [[ ${hours} != 0 ]] && out="${out}${hours}h "
-[[ "${PRECISION}" == h ]] && echo $out && exit 0
+[[ "${PRECISION}" == h ]] && display
 
 [[ ${minutes} != 0 ]] && out="${out}${minutes}m "
-[[ "${PRECISION}" == m ]] && echo $out && exit 0
+[[ "${PRECISION}" == m ]] && display
 
 [[ ${seconds} != 0 ]] && out="${out}${seconds}s "
-[[ "${PRECISION}" == s ]] && echo $out && exit 0
+[[ "${PRECISION}" == s ]] && display
 
 [[ ${millis} != 0 ]] && out="${out}${millis}ms "
 

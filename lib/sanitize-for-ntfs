@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+function replaceSpecialChars() {
+  cat \
+  | tr '<' '(' \
+  | tr '>' ')' \
+  | tr ':' '-' \
+  | tr '\\' ';' \
+  | tr '|' '.' \
+  | tr '*' '#' \
+  | tr '"' "'" \
+  | tr -d '?' \
+  | sed 's/\.$/._/g'
+}
+
+function removeTrailingSpaces() {
+  sed 's/\s+$//g'
+}
+
+dir="$(dirname -- "${1}")"
+fileName="$(basename -- "${1}")"
+
+[[ "${fileName}" == "." ]] && { exit 0; }
+
+sanitizedFileName="$(echo "${fileName}" | removeTrailingSpaces | replaceSpecialChars)"
+
+if [[ "${fileName}" != "${sanitizedFileName}" ]]; then
+  if [[ n"${DRY_RUN}" != "n" ]]; then
+    printf "%s --> %s\n" "${1}" "${dir}/${sanitizedFileName}"
+  else
+    mv "${dir}/${fileName}" "${dir}/${sanitizedFileName}"
+  fi
+fi
+

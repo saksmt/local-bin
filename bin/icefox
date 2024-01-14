@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+# NOTE: firefox does not feel good in extensions when base profile directory is moved around too much,
+# hence we can't use fully dynamic tmpdir, instead we can just use fixed path in $XDG_RUNTIME_DIR
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/require-binary
+source /usr/local/lib/help-utils
+source /usr/local/lib/prompt
+
+require-bin gpg
+require-bin firefox
+
+PROFILE_NAME="private-profile"
+FIREFOX_PROFILE_DIR="$(readlink -f ~)/.mozilla/firefox"
+
+PROFILE_ARCHIVE="${FIREFOX_PROFILE_DIR}/${PROFILE_NAME}.etgz"
+INITIAL_PROFILE="${FIREFOX_PROFILE_DIR}/${PROFILE_NAME}"
+
+PROFILE_RUNTIME_DIR="${XDG_RUNTIME_DIR}/icefox.profile"
+
+PROFILE_PASSWORD=
+
+function encrypt() {
+    gpg -c --quiet --yes --pinentry-mode loopback --passphrase "${1}" --no-tty --trust-model always
+}
+
+function decrypt() {
+    gpg -d --quiet --yes --pinentry-mode loopback --passphrase "${1}" --no-tty
+}
+
+function askPass() {
+    # todo: use GUI pin entry?
+    if [[ n"${PROFILE_PASSWORD}" == n ]]; then
+        echo "${info}Enter password: "
+        echo -n "${highlight} > ${clr}"
+        read -s pass
+        echo
+
+        if ! [ -f ${PROFILE_ARCHIVE} ]; then
+            echo "${info}Private mode of firefox is not initialized"
+            prompt "Do you want to initialize private firefox from ${highlight}${PROFILE_NAME}${clr} with given password?" && {
+                if ! [ -d ${INITIAL_PROFILE} ]; then
+                    echo "${error}Initial profile ${highlight}${PROFILE_NAME}${clr} does not exist!" >&2
+                    exit 1
+                fi
+                if [[ n"${pass}" == n ]]; then
+                    echo "${error}Password can not be empty!" >&2
+                    exit 1
+                fi
+                echo "${info}Repeat password:"
+                echo -n "${highlight} > ${clr}"
+                read -s pass2
+                echo
+
+                if [[ "${pass}" != "${pass2}" ]]; then
+                    echo "${error}Passwords did not match!" >&2
+                    pass=
+                    pass2=
+                    exit 1
+                fi
+                PROFILE_PASSWORD="${pass}"
+                pass=
+                pass2=
+                tar cz -C "${FIREFOX_PROFILE_DIR}" ${PROFILE_NAME} | encrypt "${PROFILE_PASSWORD}" > ${PROFILE_ARCHIVE} && \
+                    echo "${success}Initialized private firefox profile!"
+            }
+        else
+            PROFILE_PASSWORD="${pass}"
+            pass=
+            cat ${PROFILE_ARCHIVE} | decrypt "${PROFILE_PASSWORD}" >/dev/null || {
+                echo "${error}Incorrect password" >&2
+                exit 1
+            }
+        fi
+    fi
+}
+
+function saveProfileOnExit() {
+    echo "${info}Encrypting and storing profile"
+    tar cz -C "${PROFILE_RUNTIME_DIR}" ${PROFILE_NAME} | encrypt "${PROFILE_PASSWORD}" > ${PROFILE_ARCHIVE} || {
+        echo "${error}Failed to save profile!" >&2
+    }
+    rm -rf ${PROFILE_RUNTIME_DIR}
+}
+
+if [[ "${1}" == "--help" ]] || [[ "${1}" == "-h" ]]; then
+    echo "usage: ${highlight}icefox${clr}"
+    echo "  run firefox with encrypted private profile"
+    echo ""
+    echo "${warn}NOTE: you should configure your settings in firefox to be secure yourself!"
+    echo "${info}Initial profile will be ${highlight}${PROFILE_NAME}${clr}, it must exist in firefox profile directory prior to first run!"
+    exit 0
+fi
+
+askPass
+
+mkdir ${PROFILE_RUNTIME_DIR}
+
+echo "${info}Extracting encrypted profile"
+cat ${PROFILE_ARCHIVE} | decrypt "${PROFILE_PASSWORD}" | tar zx -C ${PROFILE_RUNTIME_DIR} ${PROFILE_NAME} || {
+  echo "${error}Failed to restore profile!" >&2
+  rm -rf ${PROFILE_RUNTIME_DIR}
+  exit 1
+}
+
+trap saveProfileOnExit TERM INT EXIT KILL
+
+echo "${info}Starting firefox with extracted profile"
+firefox --profile ${PROFILE_RUNTIME_DIR}/${PROFILE_NAME} >/dev/null
+

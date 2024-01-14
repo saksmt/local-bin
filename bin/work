@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+[[ -f /usr/local/etc/work ]] && source /usr/local/etc/work
+source /usr/local/etc/colors.sh
+
+workFile=/tmp/work-start
+pauseFile=/tmp/work-paused
+
+workDayDurationMillis=$(duration-to-millis 9h)
+overtimeThreshold=$(duration-to-millis 9m)
+
+export PRECISION=m
+
+user=${VPN_USER:?"${error}User for vpn is not set\
+${info}Set ${highlight}VPN_USER${clr} parameter in ${highlight}/usr/local/etc/work${clr}"}
+url=${VPN_URL:?"${error}URL for vpn is not set\
+${info}Set ${highlight}VPN_URL${clr} parameter in ${highlight}/usr/local/etc/work${clr}"}
+
+function working() {
+  ps ax | grep -v grep | grep -qm1 openconnect
+  return $?
+}
+
+function vpn-start() {
+  sudo openconnect -qqb -u ${user} ${url}
+}
+
+function vpn-stop() {
+  sudo pkill openconnect &>/dev/null
+}
+
+function status() {
+    if working; then
+      echo "${info}VPN up"
+    else
+      echo "${info}VPN down"
+    fi
+    if ! [[ -f ${workFile} ]]; then
+      echo "${info}Never worked in this boot"
+      exit 0
+    fi
+
+    workStarted=$(head -n1 ${workFile})
+    workEnded=$(tail -n+2 ${workFile})
+
+    workStartHumane=$(date --date=@${workStarted} +%H:%M)
+
+    if [[ n"${workEnded}" == n ]]; then
+      if [[ -f ${pauseFile} ]]; then
+        echo "${warning}On pause"
+      fi
+      workDuration=$(( $(date +%s) - $workStarted ))000
+      workEstEnd=$(( ${workStarted} + ${workDayDurationMillis} / 1000 ))
+      workEstEndHumane=$(date --date=@${workEstEnd} +%H:%M)
+      workOvertime=$(( ${workDuration} - ${workDayDurationMillis} ))
+      workOvertimeHumane=
+      if [[ ${workOvertime} -gt ${overtimeThreshold} ]]; then
+        workOvertimeHumane=", overtime: ${red}$(millis-to-duration ${workOvertime})${clr}"
+      fi
+      echo "${info}Working since ${workStartHumane}, currently for $(millis-to-duration ${workDuration} ) (work day ends at ${workEstEndHumane})${workOvertimeHumane}"
+    else
+      workDuration=$(( ${workEnded} - ${workStarted} ))000
+      workEndHumane=$(date --date=@${workEnded} +%H:%M)
+      echo "${info}Last work session lasted $(millis-to-duration ${workDuration} ) (from ${workStartHumane} till ${workEndHumane})"
+    fi
+}
+
+case "${1}" in
+  start | begin | up | resume | continue )
+    if working; then
+      echo "${info}Already working"
+      exit 0
+    fi
+    if ! [[ -f ${pauseFile} ]]; then
+      date +%s > ${workFile}
+    fi
+    vpn-start
+    rm -f ${pauseFile}
+  ;;
+  finish | stop | end | down )
+    if working || [[ -f ${pauseFile} ]]; then
+      vpn-stop
+      rm -f ${pauseFile} &>/dev/null
+      date +%s >> ${workFile}
+    fi
+    status
+  ;;
+  resolv | resolvconf | resolv.conf )
+    bat /etc/resolv.conf
+  ;;
+  stats | status )
+    status
+  ;;
+  pause)
+    if working; then
+      vpn-stop
+      touch ${pauseFile}
+    fi
+    status
+  ;;
+  * )
+    echo "usage: work <start|end|pause|resume|status|resolv.conf>"
+  ;;
+esac

@@ -3,6 +3,8 @@ PREFIX = /usr/local
 endif
 
 SRC_BIN = bin/buildkernel \
+	  bin/cpu \
+	  bin/brightness \
           bin/dropcaches \
           bin/docker-orchestra \
           bin/dropswap \
@@ -12,6 +14,9 @@ SRC_BIN = bin/buildkernel \
           bin/reload-idea-project \
           bin/memusg \
           bin/destroy \
+          bin/ntfs-is-shit \
+	  bin/min \
+	  bin/max \
           bin/take \
           bin/take-until \
           bin/drop-until \
@@ -22,6 +27,7 @@ SRC_BIN = bin/buildkernel \
           bin/mkpr \
           bin/git-parents \
           bin/private-scratch \
+          bin/icefox \
           bin/is-pwned \
           bin/docker-util \
           bin/remux-audio \
@@ -33,6 +39,7 @@ SRC_BIN = bin/buildkernel \
           bin/duration-to-millis \
           bin/millis-to-duration \
           bin/countdown \
+          bin/work \
           bin/update-nixos
 
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf.tpl
@@ -43,6 +50,7 @@ SRC_LIB = lib/colorize \
           lib/logging \
           lib/require-binary \
           lib/concurrently \
+          lib/sanitize-for-ntfs \
           lib/help-utils
 SRC_PORTAGE = portage/bin/fetch-git portage/bin/upd portage/add portage/remove portage/sync portage/.atom-regexp portage/.link-regexp portage/metadata/layout.conf portage/profiles/repo_name
 SRC_DOCKER_UTIL = lib/docker-util/clean-networks

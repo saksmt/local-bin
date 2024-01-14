@@ -16,7 +16,7 @@ if [[ n"${lastUpdated}" == n ]]; then
 fi
 sinceUpdate=$(( $(date +%s) - ${lastUpdated} ))
 
-if [[ ${sinceUpdate} -lt ${UPDATE_THRESHOLD_IN_SECONDS} ]]; then
+if [[ ${sinceUpdate} -lt ${UPDATE_THRESHOLD_IN_SECONDS} ]] && [[ "${1}" != "-f" ]]; then
   echo "${info}Not enough time passed since last re-pin, skipping..."
   exit 0
 fi
