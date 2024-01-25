@@ -1,0 +1,55 @@
+# Path to store config pid-like file enabling kubeps1 across terminals
+GLOBAL_ENABLED_FILE="${XDG_RUNTIME_DIR}/kubeps1/global-enable"
+
+# Path to store config pid-like files enabling kubeps1 in current session
+SESSION_ENABLED_DIRECTORY="${XDG_RUNTIME_DIR}/kubeps1/session"
+
+# Enable kubeps1 if current directory (or any parents) contains following file
+# Leave empty to disable this feature
+# Note: this works rather slowly since it traverses filesystem
+#       use LOCAL_MARKER_SEARCH_CUTOFF_TIMES & LOCAL_MARKER_SEARCH_CUTOFF_PWD
+#       to limit traversal of parents!
+ENABLING_LOCAL_MARKER_FILE=
+# Stop searching for marker file when traversing upwards lead to current
+# path being following. NEVER LEAVE EMPTY!
+LOCAL_MARKER_SEARCH_CUTOFF_PWD="$HOME"
+# Stop searching for marker when traversed upwards following number
+# of times
+LOCAL_MARKER_SEARCH_CUTOFF_TIMES=4
+
+# Enable kubeps1 if current directory (it's realpath) matches following regexp
+# RegExp used is PCRE, case sensitive.
+ENABLING_PWD_REGEXP=
+
+# # Define decoration function called on context and namespace names, can be used to add separators or
+# # even to colorize based on context name, first argument - context name, second argument - namespace name
+# # !!! Hint: don't forget to invalidate cache!
+# # Example:
+# #   function decorateCtxName() {
+# #       if [[ "${1}" == *prod* ]]; then
+# #           # colorize production contexts in red
+# #           echo -e "\033[31m${1}\033[0m|${2:-default}"
+# #       else
+# #           echo "${1}|${2:-default}"
+# #       fi
+# #   }
+# #   DECORATE_CONTEXT_FN=decorateCtxName
+# DECORATE_CONTEXT_FN=nameOfFunction
+
+# # Redefine default way of obtaining current context and namespace name. Should be space separated.
+# # Note that caching may break, default caching is based on last modification of kubeconfig-s and
+# # paths are taken according to `man kubectl-config` (colon separated list of paths in KUBECONFIG
+# # env variable, fallback to ~/.kube/config)
+# # !!! Hint: don't forget to invalidate cache!
+# # Example:
+# #   function getKubeContext() {
+# #       echo "$(microk8s kubectl config current-context) $(microk8s kubectl config view --minify --output 'jsonpath={..namespace}')"
+# #   }
+# #   GET_CURRENT_CONTEXT_FN=getKubeContext
+# GET_CURRENT_CONTEXT_FN=nameOfFunction
+
+# Cache file
+CACHE_FILE="${XDG_RUNTIME_DIR}/kubeps1/cache"
+
+# Max cache TTL in seconds
+MAX_CACHE_TTL_SECONDS=$(( 24 * 60 * 60 ))

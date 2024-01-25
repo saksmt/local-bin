@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/default/k8sps1
+source /usr/local/etc/k8sps1 &>/dev/null
+
+MAX_CACHE_TTL_SECONDS=${MAX_CACHE_TTL_SECONDS:-$(( 24 * 60 * 60 ))}
+LOCAL_MARKER_SEARCH_CUTOFF_PWD=${LOCAL_MARKER_SEARCH_CUTOFF_PWD:-"/home"}
+LOCAL_MARKER_SEARCH_CUTOFF_TIMES=${LOCAL_MARKER_SEARCH_CUTOFF_TIMES:-5}
+
+function defaultDecorate() {
+    echo "$* "
+}
+
+function defaultGetCurrentContext() {
+    echo "$(kubectl config current-context) $(kubectl config view --minify --output 'jsonpath={..namespace}')"
+}
+
+GET_CURRENT_CONTEXT_FN=${GET_CURRENT_CONTEXT_FN:-defaultGetCurrentContext}
+if [[ n"$(type -t "${GET_CURRENT_CONTEXT_FN}")" == n ]] &>/dev/null; then
+    echo "ERROR: supplied function to get current context is invalid! Falling back to default" >&2
+    GET_CURRENT_CONTEXT_FN=defaultGetCurrentContext
+fi
+
+DECORATE_CONTEXT_FN=${DECORATE_CONTEXT_FN:-defaultDecorate}
+if [[ n"$(type -t which "${DECORATE_CONTEXT_FN}")" == n ]] &>/dev/null; then
+    echo "ERROR: supplied function to decorate context is invalid! Disabling decoration" >&2
+fi
+
+currentFullPath=$(readlink -f "$(pwd)")
+
+function enabledGlobally() {
+    [[ -f ${GLOBAL_ENABLED_FILE} ]] \
+    && [[ "$(cat "${GLOBAL_ENABLED_FILE}")" != "off" ]]
+}
+
+function forcefullyGloballyDisabled() {
+    [[ -f ${GLOBAL_ENABLED_FILE} ]] \
+    && [[ "$(cat "${GLOBAL_ENABLED_FILE}")" == "off" ]]
+}
+
+function enabledByPwdRegexp() {
+    [[ n"${ENABLING_PWD_REGEXP}" != n ]] && { echo "${currentFullPath}" | grep -P "${ENABLING_PWD_REGEXP}" -q -m1; }
+}
+
+function searchMarkerFile() {
+    traversed=0
+    found=0
+    while [[ "$(pwd)" != "/" ]] \
+          && (( traversed < LOCAL_MARKER_SEARCH_CUTOFF_TIMES )) \
+          && [[ "$(pwd)" != "${LOCAL_MARKER_SEARCH_CUTOFF_PWD}" ]];
+    do
+        if ! find . -maxdepth 1 -type f -name "${ENABLING_LOCAL_MARKER_FILE}" -exec false {} + -quit; then
+            found=1
+            break
+        else
+            cd ..
+        fi
+        traversed=$(( traversed + 1 ))
+    done
+
+    [[ "${found}" == "1" ]]
+}
+
+function enabledByMarkerInPwdTree() {
+    [[ n"${ENABLING_LOCAL_MARKER_FILE}" != n ]] && searchMarkerFile "${currentFullPath}"
+}
+
+function enabledInThisDir() {
+    enabledByPwdRegexp || enabledByMarkerInPwdTree
+}
+
+function enabledForThisSession() {
+    [[ n"${K8SPS1_SESSION_ID}" != n ]] \
+    && [[ -f "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}" ]] \
+    && [[ "$(cat "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}")" != "off" ]]
+}
+
+function forcefullyDisabledForThisSession() {
+    [[ n"${K8SPS1_SESSION_ID}" != n ]] \
+    && [[ -f "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}" ]] \
+    && [[ "$(cat "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}")" == "off" ]]
+}
+
+function enabled() {
+    ! { forcefullyGloballyDisabled || forcefullyDisabledForThisSession; } && {
+        enabledGlobally || enabledForThisSession || enabledInThisDir;
+    }
+}
+
+###
+
+kubeConfLocations=${KUBECONFIG:-~/.kube/config}
+
+function kubeConfsLastModified() {
+    echo "${kubeConfLocations}" \
+    | tr ':' '\n' \
+    | xargs -r -L1 stat -c %Y \
+    | sort -r \
+    | head -n1
+}
+
+function lastModified() {
+    stat -c %Y "${1}"
+}
+
+function cacheExpired() {
+    if ! [[ -f ${CACHE_FILE} ]]; then
+        return 0
+    fi
+
+    local now
+    local cacheLastModified
+    local lastModifiedKubeConf
+    now=$(date +%s)
+    cacheLastModified=$(lastModified "${CACHE_FILE}")
+
+    (( now - cacheLastModified > MAX_CACHE_TTL_SECONDS )) \
+    || {
+      lastModifiedKubeConf=$(kubeConfsLastModified)
+      lastModifiedKubeConf=${lastModifiedKubeConf:-0}
+      (( lastModifiedKubeConf > cacheLastModified ))
+    }
+}
+
+function refreshCache() {
+    $DECORATE_CONTEXT_FN $($GET_CURRENT_CONTEXT_FN) > "${CACHE_FILE}"
+}
+
+function getCachedCurrentContext() {
+    if cacheExpired; then
+        refreshCache
+    fi
+    cat "${CACHE_FILE}"
+}
+
+###
+
+function show() {
+    if enabled; then
+        getCachedCurrentContext
+    fi
+}
+
+function enableForLocalSession() {
+    if [[ n"${K8SPS1_SESSION_ID}" == n ]]; then
+        echo "ERROR: K8SPS1_SESSION_ID is undefined." >&2
+    else
+        mkdir -p "${SESSION_ENABLED_DIRECTORY}" &>/dev/null
+        echo > "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}"
+    fi
+}
+
+function disableForLocalSession() {
+    if [[ n"${K8SPS1_SESSION_ID}" == n ]]; then
+        echo "ERROR: K8SPS1_SESSION_ID is undefined." >&2
+    else
+        if [[ "${1}" == "--force" ]]; then
+            mkdir -p "${SESSION_ENABLED_DIRECTORY}" &>/dev/null
+            echo "off" > "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}"
+        else
+            rm -f "${SESSION_ENABLED_DIRECTORY}/${K8SPS1_SESSION_ID}" &>/dev/null
+        fi
+    fi
+}
+
+function enableGlobally() {
+    mkdir -p "$(dirname "$(readlink -m "${GLOBAL_ENABLED_FILE}")")" &>/dev/null
+    echo > "${GLOBAL_ENABLED_FILE}"
+}
+
+function disableGlobally() {
+    if [[ "${1}" == "--force" ]]; then
+        mkdir -p "$(dirname "$(readlink -m "${GLOBAL_ENABLED_FILE}")")" &>/dev/null
+        echo "off" > "${GLOBAL_ENABLED_FILE}"
+    else
+        rm -f "${GLOBAL_ENABLED_FILE}" &>/dev/null
+    fi
+}
+
+###
+
+function isForceFlag() {
+    case "${1}" in
+        -f | --force )
+            echo "--force"
+            ;;
+    esac
+}
+
+function isGlobalFlag() {
+    case "${1}" in
+        -g | --global* )
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+###
+
+case "${1}" in
+    get )
+        show
+        ;;
+    enable | show)
+        if isGlobalFlag "${2}"; then
+            enableGlobally
+        else
+            enableForLocalSession
+        fi
+        ;;
+    disable | hide )
+        forceFlag="$(isForceFlag "${2}")$(isForceFlag "${3}")"
+        if isGlobalFlag "${2}" || isGlobalFlag "${3}"; then
+            disableGlobally "${forceFlag}"
+        else
+            disableForLocalSession "${forceFlag}"
+        fi
+        ;;
+    refresh-cache | cache-refresh | drop-cache | cache-drop | invalidate | invalidate-cache | cache-invalidate )
+        refreshCache
+        ;;
+    install )
+        if [[ "${2}" == zsh ]]; then
+            cat <<EOF1
+cat <<EOF >> ~/.zshrc
+export K8SPS1_SESSION_ID=\\\${RANDOM}
+PROMPT+='\\\$(k8sps1 get)'
+EOF
+EOF1
+        elif [[ "${2}" == bash ]]; then
+            cat <<EOF1
+cat <<EOF >> ~/.bashrc
+export K8SPS1_SESSION_ID=\\\${RANDOM}
+PS1="\\\${PS1}"'\\\$(k8sps1 get)'
+EOF
+EOF1
+        elif [[ n"${2}" == n ]]; then
+            echo "Usage: k8sps1 install <bash|zsh>"
+        else
+            echo "Unknown shell type"
+        fi
+esac

@@ -1,0 +1,54 @@
+source /usr/local/etc/colors.sh
+
+warnSign="${yellow}⚠${clr}"
+warnSign_zsh="%F{yellow}⚠%f"
+
+function decorate_contextOnly_zsh() {
+    helm="⎈"
+    context="${1}"
+    if [[ "${context}" == PROD_* ]]; then
+        helm="%F{red}${helm}%f"
+        context="${warnSign_zsh} %F{red}%BPROD%f%b ${warnSign_zsh} %F{red}${context//PROD_}%f"
+    else
+        helm="%F{cyan}${helm}%f"
+    fi
+    echo "${helm} ${context} "
+}
+
+function decorate_contextOnly() {
+    helm="⎈"
+    context="${1}"
+    if [[ "${context}" == PROD_* ]]; then
+        helm="${red}${helm}${clr}"
+        context="${warnSign} ${red}${bright}PROD${clr} ${warnSign} ${red}${context//PROD_}${clr}"
+    else
+        helm="${cyan}${helm}${clr}"
+    fi
+    echo "${helm} ${context} "
+}
+
+function decorate_full_zsh() {
+    helm="⎈"
+    context="${1}"
+    namespace="${2}"
+    if [[ "${context}" == PROD_* ]]; then
+        helm="%F{red}${helm}%f"
+        context="${warnSign_zsh} %F{red}%BPROD%b%f ${warnSign_zsh} %F{red}${context//PROD_}%f"
+    else
+        helm="${cyan}${helm}%f"
+    fi
+    echo "${helm} ${context}/${namespace} "
+}
+
+function decorate_full() {
+    helm="⎈"
+    context="${1}"
+    namespace="${2}"
+    if [[ "${context}" == PROD_* ]]; then
+        helm="${red}${helm}${clr}"
+        context="${warnSign} ${red}${bright}PROD${clr} ${warnSign} ${red}${context//PROD_}${clr}"
+    else
+        helm="${cyan}${helm}${clr}"
+    fi
+    echo "${helm} ${context}/${namespace} "
+}

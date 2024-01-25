@@ -3,8 +3,7 @@ PREFIX = /usr/local
 endif
 
 SRC_BIN = bin/buildkernel \
-	  bin/cpu \
-	  bin/brightness \
+          bin/brightness \
           bin/dropcaches \
           bin/docker-orchestra \
           bin/dropswap \
@@ -15,8 +14,8 @@ SRC_BIN = bin/buildkernel \
           bin/memusg \
           bin/destroy \
           bin/ntfs-is-shit \
-	  bin/min \
-	  bin/max \
+          bin/min \
+          bin/max \
           bin/take \
           bin/take-until \
           bin/drop-until \
@@ -40,9 +39,11 @@ SRC_BIN = bin/buildkernel \
           bin/millis-to-duration \
           bin/countdown \
           bin/work \
+          bin/k8sps1 \
           bin/update-nixos
 
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf.tpl
+SRC_ETC_DEFAULT = etc/default/k8sps1 etc/default/k8sps1.fancy
 SRC_SHARE = usr/share/font_8x16.c
 SRC_LIB = lib/colorize \
           lib/command-loader \
@@ -58,25 +59,27 @@ SRC_DOCKER_UTIL = lib/docker-util/clean-networks
 .PHONY: all install uninstall installdirs
 
 all:
-	@echo "You can either install or unintall this scripts."
+	@echo "You can either install or uninstall these scripts."
 	@echo "Use:"
 	@echo "   make install"
 	@echo " or"
 	@echo "   make uninstall"
 
 installdirs:
-	if [[ ! -d $(PREFIX) ]]; then mkdir $(PREFIX); fi
-	if [[ ! -d $(PREFIX)/bin ]]; then mkdir $(PREFIX)/bin; fi
-	if [[ ! -d $(PREFIX)/etc ]]; then mkdir $(PREFIX)/etc; fi
-	if [[ ! -d $(PREFIX)/lib ]]; then mkdir $(PREFIX)/lib; fi
-	if [[ ! -d $(PREFIX)/lib/docker-util ]]; then mkdir $(PREFIX)/lib/docker-util; fi
-	if [[ ! -d $(PREFIX)/usr ]]; then mkdir $(PREFIX)/usr; fi
-	if [[ ! -d $(PREFIX)/usr/share ]]; then mkdir $(PREFIX)/usr/share; fi
-	if [[ ! -d $(PREFIX)/portage ]]; then mkdir $(PREFIX)/portage; fi
+	install -d \
+        $(PREFIX)/bin \
+        $(PREFIX)/etc \
+        $(PREFIX)/etc/default \
+        $(PREFIX)/lib \
+        $(PREFIX)/lib/docker-util \
+        $(PREFIX)/usr \
+        $(PREFIX)/usr/share \
+        $(PREFIX)/usr/portage
 
 install: installdirs
 	install -t $(PREFIX)/bin $(SRC_BIN)
 	install -t $(PREFIX)/etc $(SRC_ETC)
+	install -t $(PREFIX)/etc/default $(SRC_ETC_DEFAULT)
 	install -t $(PREFIX)/lib $(SRC_LIB)
 	install -t $(PREFIX)/lib/docker-util $(SRC_DOCKER_UTIL)
 	install -t $(PREFIX)/usr/share $(SRC_SHARE)
