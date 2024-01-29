@@ -3,85 +3,78 @@
 [[ -f /usr/local/etc/work ]] && source /usr/local/etc/work
 source /usr/local/etc/colors.sh
 
-workFile=/tmp/work-start
-pauseFile=/tmp/work-paused
+TMP_FILES_ROOT=${TMP_FILES_ROOT:-${XDG_RUNTIME_DIR}/work.script}
 
-workDayDurationMillis=$(duration-to-millis 9h)
-overtimeThreshold=$(duration-to-millis 9m)
+mkdir -p "${TMP_FILES_ROOT}" &>/dev/null
 
-export PRECISION=m
+workFile="${TMP_FILES_ROOT}/work-start"
+pauseFile="${TMP_FILES_ROOT}/work-paused"
 
-user=${VPN_USER:?"${error}User for vpn is not set\
-${info}Set ${highlight}VPN_USER${clr} parameter in ${highlight}/usr/local/etc/work${clr}"}
-url=${VPN_URL:?"${error}URL for vpn is not set\
-${info}Set ${highlight}VPN_URL${clr} parameter in ${highlight}/usr/local/etc/work${clr}"}
+workDayDurationMillis=$(duration-to-millis "${WORK_DAY_DURATION:-9h}")
+overtimeThreshold=$(duration-to-millis "${OVERTIME_THRESHOLD:-9m}")
 
-function working() {
-  ps ax | grep -v grep | grep -qm1 openconnect
-  return $?
-}
+export PRECISION=${REPORTING_PRECISION:-m}
 
-function vpn-start() {
-  sudo openconnect -qqb -u ${user} ${url}
-}
-
-function vpn-stop() {
-  sudo pkill openconnect &>/dev/null
-}
+{ [[ n"$(type -t vpn-start)" == n ]] \
+  || [[ n"$(type -t vpn-stop)" == n ]] \
+  || [[ n"$(type -t vpn-is-up)" == n ]]; } && {
+    echo "${error}You need to define ${cyan}vpn-start${clr}, ${cyan}vpn-stop${clr} and ${cyan}vpn-is-up${clr} functions in ${highlight}/usr/local/etc/work${clr}" >&2
+    exit 1;
+  }
 
 function status() {
-    if working; then
+    if vpn-is-up; then
       echo "${info}VPN up"
     else
       echo "${info}VPN down"
     fi
-    if ! [[ -f ${workFile} ]]; then
+    if ! [[ -f "${workFile}" ]]; then
       echo "${info}Never worked in this boot"
       exit 0
     fi
 
-    workStarted=$(head -n1 ${workFile})
-    workEnded=$(tail -n+2 ${workFile})
+    workStarted=$(head -n1 "${workFile}")
+    workEnded=$(tail -n+2 "${workFile}")
 
-    workStartHumane=$(date --date=@${workStarted} +%H:%M)
+    workStartHumane=$(date --date=@"${workStarted}" +%H:%M)
 
     if [[ n"${workEnded}" == n ]]; then
       if [[ -f ${pauseFile} ]]; then
         echo "${warning}On pause"
       fi
-      workDuration=$(( $(date +%s) - $workStarted ))000
-      workEstEnd=$(( ${workStarted} + ${workDayDurationMillis} / 1000 ))
+      workDuration=$(( $(date +%s) - workStarted ))000
+      workEstEnd=$(( workStarted + workDayDurationMillis / 1000 ))
       workEstEndHumane=$(date --date=@${workEstEnd} +%H:%M)
-      workOvertime=$(( ${workDuration} - ${workDayDurationMillis} ))
+      workOvertime=$(( workDuration - workDayDurationMillis ))
       workOvertimeHumane=
       if [[ ${workOvertime} -gt ${overtimeThreshold} ]]; then
         workOvertimeHumane=", overtime: ${red}$(millis-to-duration ${workOvertime})${clr}"
       fi
       echo "${info}Working since ${workStartHumane}, currently for $(millis-to-duration ${workDuration} ) (work day ends at ${workEstEndHumane})${workOvertimeHumane}"
     else
-      workDuration=$(( ${workEnded} - ${workStarted} ))000
-      workEndHumane=$(date --date=@${workEnded} +%H:%M)
+      workDuration=$(( workEnded - workStarted ))000
+      workEndHumane=$(date --date=@"${workEnded}" +%H:%M)
       echo "${info}Last work session lasted $(millis-to-duration ${workDuration} ) (from ${workStartHumane} till ${workEndHumane})"
     fi
 }
 
 case "${1}" in
   start | begin | up | resume | continue )
-    if working; then
+    if vpn-is-up; then
       echo "${info}Already working"
       exit 0
     fi
     if ! [[ -f ${pauseFile} ]]; then
-      date +%s > ${workFile}
+      date +%s > "${workFile}"
     fi
     vpn-start
-    rm -f ${pauseFile}
+    rm -f "${pauseFile}"
   ;;
   finish | stop | end | down )
-    if working || [[ -f ${pauseFile} ]]; then
+    if vpn-is-up || [[ -f "${pauseFile}" ]]; then
       vpn-stop
-      rm -f ${pauseFile} &>/dev/null
-      date +%s >> ${workFile}
+      rm -f "${pauseFile}" &>/dev/null
+      date +%s >> "${workFile}"
     fi
     status
   ;;
@@ -92,9 +85,9 @@ case "${1}" in
     status
   ;;
   pause)
-    if working; then
+    if vpn-is-up; then
       vpn-stop
-      touch ${pauseFile}
+      touch "${pauseFile}"
     fi
     status
   ;;
