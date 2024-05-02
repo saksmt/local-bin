@@ -2,6 +2,30 @@
 
 Simple script to display current k8s context and namespace.
 
+## Prerequisites
+
+### (Non-comprehensive) List of GNU coreutils commands used
+
+ - find - usage in k8sps1 conforms to POSIX, but is not guaranteed
+ - grep
+ - head
+ - mkdir
+ - readlink
+ - rm
+ - sort
+ - stat
+ - tail
+ - tr
+ - xargs
+
+#### What does it mean?
+
+It means that it will work virtually on any linux with bash installed but will possibly fail on macOS and BSD (untested). To try and make it work
+on macOS and BSD you can install GNU coreutils and make it so that script can access it with unprefixed names, for example, on macOS you need to follow
+[this](https://apple.stackexchange.com/a/69332) answer on stackexchange and place `export PATH="/usr/local/opt/coreutils/libexec/gnubin:${PATH}""`
+into `k8sps1` configuration file and it *may* work. All bugs related to incompatibility between BSD/macOS coreutils and GNU ones
+will be ignored.
+
 ## Installation
 
 Call `k8sps1 install bash`/`k8sps1 install zsh` and execute script from output.
@@ -26,7 +50,8 @@ tells to show (current session, global, configured)
 
 All configuration is done through `/usr/local/etc/k8sps1` config file. Format - bash.
 You can see default values, description and possible configuration options in
-`/usr/local/etc/default/k8sps1`
+`/usr/local/etc/default/k8sps1`. You can also place `PATH` overrides there to
+try and make this script work on macOS or BSD.
 
 There are two main ways to configure automatic display: by regex on current working directory and
 by locating file in current working directory tree.

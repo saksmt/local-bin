@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+DEFAULT_FILE_CACHE_TTL_SECONDS=${DEFAULT_FILE_CACHE_TTL_SECONDS:-3600}
+
+function cache.putPipe() {
+  cacheFile="${1}"
+  mkdir -p "$(dirname "$(readlink -m "${cacheFile}")")"
+
+  cat > "${cacheFile}"
+}
+
+function cache.expired() {
+  cacheFile="${1}"
+  ttl=${2:-${DEFAULT_FILE_CACHE_TTL_SECONDS}}
+
+  if ! [[ -f ${1} ]]; then
+    return 0
+  fi
+
+  local now
+  local cacheLastModified
+  now=$(date +%s)
+  cacheLastModified=$(cache.lastModified "${cacheFile}")
+
+  (( now - cacheLastModified > ttl ))
+}
+
+function cache.lastModified() {
+  cacheFile="${1}"
+  stat -c %Y "${cacheFile}"
+}
+
+function cache.get() {
+  cacheFile="${1}"
+  cat "${cacheFile}"
+}

@@ -1,0 +1,35 @@
+# Redefine default way of obtaining list of namespaces of current context in namespace
+# Function should print new line separated list with names of namespaces
+# LIST_NAMESPACES_FN=nameOfFunction
+
+# Modify how namespaces are displayed, for example you can highlight namespaces ending in -system in red
+# Function will be called on each namespace displayed with two arguments: first - namespace to be printed,
+# second - current namespace. Function should print decorated result to stdout.
+# DECORATE_NAMESPACE_FN=nameOfFunction
+
+# Redefine default way of obtaining list of contexts in kubernetes
+# Function should print new line separated list with names of contexts
+# LIST_CONTEXTS_FN=nameOfFunction
+
+# Modify how contexts are displayed, for example you can highlight your production contexts in red.
+# Function will be called on each context displayed with two arguments: first - context to be printed,
+# second - current context. Function should print decorated result to stdout
+# DECORATE_CONTEXT_FN=nameOfFunction
+
+# INTERNAL. Redefine how to obtain current namespace and context, function should print
+# single line in format: CONTEXT_NAME + "\xA0" + NAMESPACE_NAME, when redefining
+# with function declared in same file - tuple helper function can be used
+# GET_CURRENT_CONTEXT_FN=nameOfFunction
+
+# Path to cache file with
+CONTEXT_CACHE_FILE="${XDG_RUNTIME_DIR}/k8s-interactive-choose/context-cache"
+CONTEXT_CACHE_TTL_SECONDS=$((24 * 60 * 60))
+
+CURRENT_CONTEXT_CACHE_FILE="${XDG_RUNTIME_DIR}/k8s-interactive-choose/current-context-cache"
+CURRENT_CONTEXT_CACHE_TTL_SECONDS=$((24 * 60 * 60))
+
+NAMESPACE_CACHE_DIR="${XDG_RUNTIME_DIR}/k8s-interactive-choose/namespace-cache"
+NAMESPACE_CACHE_TTL_SECONDS=$((24 * 60 * 60))
+
+CONTEXT_HIST_FILE="${XDG_RUNTIME_DIR}/k8s-interactive-choose/context-history"
+NAMESPACE_HIST_FILE="${XDG_RUNTIME_DIR}/k8s-interactive-choose/namespace-history"

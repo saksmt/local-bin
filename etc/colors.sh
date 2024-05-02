@@ -4,6 +4,8 @@ esc=`echo -en "\033"`
 
 clr="${esc}[0m"
 bright="${esc}[1m"
+dim="${esc}[2m"
+underline="${esc}[4m"
 
 black="${esc}[30m"
 red="${esc}[31m"

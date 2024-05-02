@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+
+source /usr/local/etc/colors.sh
+source /usr/local/lib/require-binary
+source /usr/local/lib/file-cache
+source /usr/local/lib/prompt
+source /usr/local/lib/fp-utils
+
+source /usr/local/etc/default/k8s-interactive-choose
+source /usr/local/etc/k8s-interactive-choose &>/dev/null
+
+require-bin fzf
+
+shopt -s extglob
+
+DECORATE_NAMESPACE_FN="${DECORATE_NAMESPACE_FN:-defaultDecorateNamespace}"
+LIST_NAMESPACES_FN="${LIST_NAMESPACES_FN:-defaultListNamespaces}"
+
+DECORATE_CONTEXT_FN="${DECORATE_CONTEXT_FN:-defaultDecorateContext}"
+LIST_CONTEXTS_FN="${LIST_CONTEXTS_FN:-defaultListContexts}"
+
+GET_CURRENT_CONTEXT_FN="${GET_CURRENT_CONTEXT_FN:-defaultGetCurrentContext}"
+
+kubeConfLocations="${KUBECONFIG:-${HOME}/.kube/config}"
+
+CONTEXT_CACHE_FILE="${CONTEXT_CACHE_FILE:-${XDG_RUNTIME_DIR}/k8s-interactive-choose/context-cache}"
+CONTEXT_CACHE_TTL_SECONDS=${CONTEXT_CACHE_TTL_SECONDS:-$((24 * 60 * 60))}
+
+CURRENT_CONTEXT_CACHE_FILE="${CURRENT_CONTEXT_CACHE_FILE:-${XDG_RUNTIME_DIR}/k8s-interactive-choose/current-context-cache}"
+CURRENT_CONTEXT_CACHE_TTL_SECONDS=${CURRENT_CONTEXT_CACHE_TTL_SECONDS:-$((24 * 60 * 60))}
+
+NAMESPACE_CACHE_DIR="${NAMESPACE_CACHE_DIR:-${XDG_RUNTIME_DIR}/k8s-interactive-choose/namespace-cache}"
+NAMESPACE_CACHE_TTL_SECONDS=${NAMESPACE_CACHE_TTL_SECONDS:-$((24 * 60 * 60))}
+
+CONTEXT_HIST_FILE="${CONTEXT_HIST_FILE:-${XDG_RUNTIME_DIR}/k8s-interactive-choose/context-history}"
+NAMESPACE_HIST_FILE="${NAMESPACE_HIST_FILE:-${XDG_RUNTIME_DIR}/k8s-interactive-choose/namespace-history}"
+
+function defaultGetCurrentContext() {
+  tuple "$(kubectl config current-context)" "$(kubectl config view --minify --output 'jsonpath={..namespace}')"
+}
+
+function defaultDecorateNamespace() {
+  local prefixC
+  local suffix
+
+  [[ "${1}" == "${2}" ]] && {
+    suffix="${clr} ${dim}//${clr} ${bright}CURRENT${clr}"
+    prefixC="${underline}"
+  }
+
+  echo "${prefixC}${1}${suffix}"
+}
+
+function defaultListNamespaces() {
+  kubectl get namespaces -o go-template --template='{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}'
+}
+
+function defaultDecorateContext() {
+  local prefixC
+  local suffix
+
+  [[ "${1}" == "${2}" ]] && {
+    suffix="${clr} ${dim}//${clr} ${bright}CURRENT${clr}"
+    prefixC="${underline}"
+  }
+  if [[ "${1}" =~ PROD_.* ]]; then
+    echo "${prefixC}${red}PROD${clr}${highlight}!${clr}${prefixC}${1:5}${suffix}"
+  else
+    echo "${prefixC}${1}${suffix}"
+  fi
+}
+
+function defaultListContexts() {
+  kubectl config get-contexts -o name
+}
+
+### region utils
+
+function kubeConfsLastModified() {
+  echo "${kubeConfLocations}" \
+  | tr ':' '\n' \
+  | xargs -r -L1 stat -c %Y \
+  | sort -r \
+  | head -n1
+}
+
+function kubeDependentCacheExpired() {
+  cache.expired "${1}" ${2} || {
+    lastModifiedKubeConf=$(kubeConfsLastModified)
+    lastModifiedKubeConf=${lastModifiedKubeConf:-0}
+    (( lastModifiedKubeConf > $(cache.lastModified "${1}") ))
+  }
+}
+
+function highlightKubeError() {
+  local firstLine=true
+  while read -r line; do
+    if [[ "${firstLine}" == "true" ]]; then
+      echo -e "${error}Failed to ${1}:" >&2
+      firstLine=false
+    fi
+    echo -e "${red}>|${clr} ${line}" >&2
+  done
+}
+
+### endregion
+
+###
+
+### region context
+
+function contextCacheExpired() {
+  kubeDependentCacheExpired "${CONTEXT_CACHE_FILE}" ${CONTEXT_CACHE_TTL_SECONDS}
+}
+
+function refreshContextCache() {
+  $LIST_CONTEXTS_FN | zipWith flip "${DECORATE_CONTEXT_FN}" "$(getCachedCurrentContext)" | cache.putPipe "${CONTEXT_CACHE_FILE}"
+}
+
+function _listContexts() {
+  if contextCacheExpired; then
+    refreshContextCache
+  fi
+  cache.get "${CONTEXT_CACHE_FILE}"
+}
+
+function _switchContext() {
+  decoratedTarget="$(${DECORATE_CONTEXT_FN} "${1}")"
+  if [[ "$(getCachedCurrentContext)" == "${1}" ]]; then
+    echo "${info}Already on ${highlight}${decoratedTarget}${clr}"
+  else
+    set -o pipefail
+
+    kubectl config use "${1}" 2>&1 >/dev/null | highlightKubeError "switch context to ${highlight}${decoratedTarget}${clr}" && {
+      refreshContextCache
+      echo "${success}Switched to ${highlight}${decoratedTarget}${clr}";
+    }
+  fi
+}
+
+### endregion
+
+###
+
+### region current-context
+
+function currentContextCacheExpired() {
+  kubeDependentCacheExpired "${CURRENT_CONTEXT_CACHE_FILE}" ${CURRENT_CONTEXT_CACHE_TTL_SECONDS}
+}
+
+function refreshCurrentContextCache() {
+  $GET_CURRENT_CONTEXT_FN | cache.putPipe "${CURRENT_CONTEXT_CACHE_FILE}"
+}
+
+function getCachedCurrentContextInfo() {
+  if currentContextCacheExpired; then
+      refreshCurrentContextCache
+  fi
+  cache.get "${CURRENT_CONTEXT_CACHE_FILE}"
+}
+
+function getCachedCurrentContext() {
+  getCachedCurrentContextInfo | tuple.fst
+}
+
+function getCachedCurrentNamespace() {
+  getCachedCurrentContextInfo | tuple.snd
+}
+
+### endregion
+
+###
+
+### region namespace
+
+function namespaceCacheExpired() {
+  currentContextCacheExpired || \
+    cache.expired "${NAMESPACE_CACHE_DIR}/$(getCachedCurrentContext)" ${NAMESPACE_CACHE_TTL_SECONDS}
+}
+
+function refreshNamespaceCache() {
+  refreshCurrentContextCache
+  context="$(getCachedCurrentContext)"
+
+  $LIST_NAMESPACES_FN | zipWith flip "${DECORATE_NAMESPACE_FN}" "$(getCachedCurrentNamespace)" | cache.putPipe "${NAMESPACE_CACHE_DIR}/${context}"
+}
+
+function _listNamespaces() {
+  context="$(getCachedCurrentContext)"
+  if namespaceCacheExpired "${context}"; then
+    refreshNamespaceCache
+    context="$(getCachedCurrentContext)"
+  fi
+  cache.get "${NAMESPACE_CACHE_DIR}/${context}"
+}
+
+function _switchNamespace() {
+  decoratedTarget="$(${DECORATE_NAMESPACE_FN} "${1}")"
+  if [[ "$(getCachedCurrentNamespace)" == "${1}" ]]; then
+    echo "${info}Already on ${highlight}${decoratedTarget}${clr}"
+  else
+    decoratedCurrentContext="$(${DECORATE_CONTEXT_FN} "$(getCachedCurrentContext)")"
+    prompt "Do you want to modify ${highlight}${decoratedCurrentContext}${clr} context and set it's namespace to ${highlight}${decoratedTarget}${clr}?" && {
+      kubectl config set-context --current --namespace "${1}" 2>&1 >/dev/null \
+      | highlightKubeError "set namespace to ${2} in ${highlight}${decoratedCurrentContext}${clr}" && {
+        refreshNamespaceCache
+        echo "${success}Updated namespace in ${highlight}${decoratedCurrentContext}${clr} to ${highlight}${decoratedTarget}${clr}";
+      }
+    }
+  fi
+}
+
+### endregion
+
+
+listFunction=
+applyFunction=
+historyFile=
+
+case "${1}" in
+  n?(a)?(m)?(e)?(s)?(p)?(a)?(c)?(e) )
+    listFunction=_listNamespaces
+    applyFunction=_switchNamespace
+    mkdir -p "$(dirname "${NAMESPACE_HIST_FILE}")" &>/dev/null
+    historyFile="${NAMESPACE_HIST_FILE}"
+    ;;
+  c?(o)?(n)?(t)?(e)?(x)?(t) )
+    listFunction=_listContexts
+    applyFunction=_switchContext
+    mkdir -p "$(dirname "${CONTEXT_HIST_FILE}")" &>/dev/null
+    historyFile="${CONTEXT_HIST_FILE}"
+    ;;
+  r?(e)?(f)?(r)?(e)?(s)?(h) )
+    refreshContextCache
+    refreshNamespaceCache
+    exit 0
+    ;;
+  '' )
+    echo "${error}Provide one of: <${cyan}namespace${clr}|${cyan}context${clr}|${cyan}refresh${clr}>"
+    exit 1
+    ;;
+  * )
+    echo "${error}Unknown option: ${1}"
+    exit 1
+esac
+
+selected="$($listFunction | fzf --history="${historyFile}" --ansi --with-nth=2 -d"${tupleDelim}" --no-multi)"
+
+[[ n"${selected}" != n ]] && tupled $applyFunction "${selected}"

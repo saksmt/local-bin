@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+tupleDelim="$(printf "\xA0")"
+
+# Make tuple from specified arguments
+# @param {1...} tuple positional values
+# @stdout resulting tuple
+function tuple() {
+  echo -n "${1}"
+  for (( i=2; i <= ${#}; i = i + 1 )); do
+    echo -n "${tupleDelim}${!i}"
+  done
+  echo
+}
+
+# Get Nth element of tuple
+# @param {stdin} tuple to extract Nth argument from
+# @param {1} index of tuple element to extract
+# @stdout Nth element of tuple
+function tuple.nth() {
+  cat | cut -d"${tupleDelim}" -f"${1}"
+}
+
+# Get first element of tuple
+# @param {stdin} tuple to extract first element from
+# @stdout First element of tuple
+function tuple.fst() {
+  tuple.nth 1
+}
+
+# Get second element of tuple
+# @param {stdin} tuple to extract second element from
+# @stdout Second element of tuple
+function tuple.snd() {
+  tuple.nth 2
+}
+
+# Call function with arguments extracted from tuple
+# @param {1} Function name
+# @param {2} tuple with arguments
+function tupled() {
+  f="${1}"
+  IFS="${tupleDelim}" read -ra args <<< "${2}"
+
+  $f "${args[@]}"
+}
+
+# Zip output with result of calling function with specified arguments
+# Example:
+#   Code: { echo 1; echo 2; } | zipWith echo -e "Called with: "
+#   Output (here "<tuple: (,)>" is not actual string but syntax to denote tuple value):
+#     <tuple: (1, "Called with: 1")>
+#     <tuple: (2, "Called with: 2")>
+# @param {stdin} Output to process
+# @param {1} Function name
+# @param {2...} Function additional arguments, that will prepended before output of line
+function zipWith() {
+  f="${1}"
+  shift
+  while IFS= read -r v; do
+    tuple "${v}" "$($f "${@}" "${v}")"
+  done
+}
+
+# call function with arguments in reverse
+# @param {1} function name
+# @param {2...} function arguments
+function flip() {
+  f="${1}"
+  shift
+  local args
+  local last
+  last=${#}
+  for (( i = last; i > 0; i-- )); do
+    args+=( "${!i}" )
+  done
+  $f "${args[@]}"
+}

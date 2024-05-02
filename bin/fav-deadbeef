@@ -14,7 +14,11 @@ function add() {
     songName=$(deadbeef --nowplaying "%a (%b) - %n. %t" 2> /dev/null)
     [ -f ${FAV_FILE} ] || echo "${SEP}" >> ${FAV_FILE}
     echo "${songPath} // ${songName}" >> ${FAV_FILE}
-    echo "${success}Added ${cyan}${songName}${clr} to favorites list"
+    if [[ "$1" == "--raw" ]]; then
+        echo "${songName}"
+    else
+        echo "${success}Added ${cyan}${songName}${clr} to favorites list"
+    fi
 }
 
 function flush() {
@@ -101,6 +105,7 @@ function help() {
     echo "  fav-deadbeef <add|remove|flush|dump|unflush|show|latest|new|show-latest|show-new|show-raw|raw|help> [OPTIONS]"
     echo "MODES"
     echo "  add             Add currently playing song to favorites"
+    echo "  add-raw         Add currently playing song to favorites, undecorated output"
     echo "  remove          Remove last favorite. Useful when accidentally added some favorite"
     echo "  flush|dump      Flush playlist of currently non proccessed (non copied to player for ex.)"
     echo "  unflush         Restore currently non processed. Works only once per flush"
@@ -119,7 +124,9 @@ mode="${1}"
 shift
 
 case ${mode} in
-    add | "")                               add ;;
+    add | "")                               add ${@} ;;
+    add-raw )                               add --raw ;;
+    --raw )                                 add --raw ;;
 
     flush | dump )                          flush ;;
 

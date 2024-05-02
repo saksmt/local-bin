@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source /usr/local/lib/file-cache
+
 source /usr/local/etc/default/k8sps1
 source /usr/local/etc/k8sps1 &>/dev/null
 
@@ -22,7 +24,7 @@ if [[ n"$(type -t "${GET_CURRENT_CONTEXT_FN}")" == n ]] &>/dev/null; then
 fi
 
 DECORATE_CONTEXT_FN=${DECORATE_CONTEXT_FN:-defaultDecorate}
-if [[ n"$(type -t which "${DECORATE_CONTEXT_FN}")" == n ]] &>/dev/null; then
+if [[ n"$(type -t "${DECORATE_CONTEXT_FN}")" == n ]] &>/dev/null; then
     echo "ERROR: supplied function to decorate context is invalid! Disabling decoration" >&2
 fi
 
@@ -104,33 +106,22 @@ function lastModified() {
 }
 
 function cacheExpired() {
-    if ! [[ -f ${CACHE_FILE} ]]; then
-        return 0
-    fi
-
-    local now
-    local cacheLastModified
-    local lastModifiedKubeConf
-    now=$(date +%s)
-    cacheLastModified=$(lastModified "${CACHE_FILE}")
-
-    (( now - cacheLastModified > MAX_CACHE_TTL_SECONDS )) \
-    || {
-      lastModifiedKubeConf=$(kubeConfsLastModified)
-      lastModifiedKubeConf=${lastModifiedKubeConf:-0}
-      (( lastModifiedKubeConf > cacheLastModified ))
+    cache.expired "${CACHE_FILE}" || {
+        lastModifiedKubeConf=$(kubeConfsLastModified)
+        lastModifiedKubeConf=${lastModifiedKubeConf:-0}
+        (( lastModifiedKubeConf > $(cache.lastModified "${CACHE_FILE}") ))
     }
 }
 
 function refreshCache() {
-    $DECORATE_CONTEXT_FN $($GET_CURRENT_CONTEXT_FN) > "${CACHE_FILE}"
+    $DECORATE_CONTEXT_FN $($GET_CURRENT_CONTEXT_FN) | cache.putPipe "${CACHE_FILE}"
 }
 
 function getCachedCurrentContext() {
     if cacheExpired; then
         refreshCache
     fi
-    cat "${CACHE_FILE}"
+    cache.get "${CACHE_FILE}"
 }
 
 ###

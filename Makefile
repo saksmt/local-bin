@@ -40,10 +40,13 @@ SRC_BIN = bin/buildkernel \
           bin/countdown \
           bin/work \
           bin/k8sps1 \
+          bin/k8s-interactive-choose \
+          bin/kfw \
+          bin/kafka-kfw \
           bin/update-nixos
 
 SRC_ETC = etc/colors.sh etc/guard.sh etc/buildtools/kernel.conf etc/overlay/config etc/pr.conf.tpl
-SRC_ETC_DEFAULT = etc/default/k8sps1 etc/default/k8sps1.fancy
+SRC_ETC_DEFAULT = etc/default/k8sps1 etc/default/k8sps1.fancy etc/default/k8s-interactive-choose
 SRC_SHARE = usr/share/font_8x16.c
 SRC_LIB = lib/colorize \
           lib/command-loader \
@@ -52,6 +55,8 @@ SRC_LIB = lib/colorize \
           lib/require-binary \
           lib/concurrently \
           lib/sanitize-for-ntfs \
+          lib/fp-utils \
+          lib/file-cache \
           lib/help-utils
 SRC_PORTAGE = portage/bin/fetch-git portage/bin/upd portage/add portage/remove portage/sync portage/.atom-regexp portage/.link-regexp portage/metadata/layout.conf portage/profiles/repo_name
 SRC_DOCKER_UTIL = lib/docker-util/clean-networks
