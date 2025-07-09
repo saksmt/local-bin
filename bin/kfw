@@ -2,6 +2,31 @@
 
 shopt -s extglob
 
+TEMP="$(getopt -o 'n:g' -l 'namespace:global' -- "${@}")" || exit 1
+eval set -- "${TEMP}"
+unset TEMP
+
+namespaceArg=""
+addressArg=""
+
+while true; do
+  case "${1}" in
+    '-n'|'--namespace' )
+      namespaceArg="-n ${2}"
+      shift 2
+      ;;
+    '-g'|'--global' )
+      shift
+      addressArg="--address 0.0.0.0"
+      ;;
+    '--')
+      shift
+      break
+      ;;
+  esac
+done
+
+
 port=
 service=
 
@@ -32,6 +57,5 @@ esac
   exit 1;
 }
 
-kubectl port-forward service/${service} ${port}
-
+kubectl ${namespaceArg} port-forward ${addressArg} service/${service} ${port}
 
