@@ -1,3 +1,0 @@
-LOGIN=
-REPO_URL=
-

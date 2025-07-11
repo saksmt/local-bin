@@ -8,7 +8,7 @@ destructionPath=$(realpath ${1})
 shreddingRounds=10
 
 if ! [[ -d ${destructionPath} ]]; then
-    echo "${error}Given path (${cyan}${destructionPath}${crl}) is either does not exist or is not a directory!"
+    echo "${error}Given path (${cyan}${destructionPath}${crl}) either does not exist or is not a directory!"
     exit 1
 fi
 

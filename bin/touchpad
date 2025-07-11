@@ -2,7 +2,7 @@
 
 source /usr/local/etc/colors.sh
 
-touchpadDeviceId=$(xinput list --id-only "$(xinput list --name-only | grep -i touchpad)")
+touchpadDeviceId=$(xinput list --id-only "$(xinput list --name-only | grep -iP 'touchpad|syna')")
 
 function showStatus() {
 	[[ "$(xinput list $touchpadDeviceId | grep 'This device is disabled')" =~ "This device is disabled" ]] \
@@ -24,5 +24,5 @@ case "$1" in
     "status" | "--status" | "") showStatus ;;
     "enable" | "--enable") enable ;;
     "disable" | "--disable") disable ;;
-    *) echo "${error}Unknown comand: ${cyan}${1}${clr}. Available commands are: ${cyan}status${clr}, ${cyan}enable${clr}, ${cyan}disable${clr}"; exit 1 ;;
+    *) echo "${error}Unknown command: ${cyan}${1}${clr}. Available commands are: ${cyan}status${clr}, ${cyan}enable${clr}, ${cyan}disable${clr}"; exit 1 ;;
 esac
